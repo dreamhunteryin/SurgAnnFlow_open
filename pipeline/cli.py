@@ -1,4 +1,4 @@
-"""surgann：標註平台的薄入口 CLI（R10）。核心邏輯都在 pipeline/ 各模組。"""
+"""surgann：標註平台的薄入口 CLI。核心邏輯都在 pipeline/ 各模組。"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,7 +26,7 @@ def init_db():
 
 
 def _require_series(series_id: str) -> None:
-    """series_id 必須已存在於 series 表（v1.3 起系列先建後用，維持 ID 前綴一致性）。"""
+    """series_id 必須已存在於 series 表（系列先建後用，維持 ID 前綴一致性）。"""
     with registry.connect() as conn:
         if registry.get_series(conn, series_id) is not None:
             return
@@ -306,14 +306,14 @@ def derive(
         console.print("[red]✗[/] 找不到 export run，請先執行 [bold]surgann export-ls[/]")
         raise typer.Exit(code=1)
 
-    out = derive_mod.run_derive(config.to_abs(run["run_dir"]), intervals)  # v1.4 相對路徑
+    out = derive_mod.run_derive(config.to_abs(run["run_dir"]), intervals)  # schema v1.4 相對路徑
     console.print(f"[green]✓ derive 完成[/] run_id=[cyan]{run['run_id']}[/]")
     for name, path in out.outputs.items():
         grid = ", ".join(f"{v}:{n}點" for v, n in out.grid_counts[name].items()) or "無標註"
         console.print(f"  {name}: {out.row_counts[name]} 列（{grid}）→ {path.name}")
 
 
-# ------------------------------------------------------------- M2: 抽幀 -----
+# ----------------------------------------------------------------- 抽幀 -----
 
 @app.command("sample")
 def sample_cmd(
@@ -360,7 +360,7 @@ def export_spatial_cmd(
     )
 
 
-# ------------------------------------------- M3: 資料集匯出 / 格式轉換 -------
+# ----------------------------------------------- 資料集匯出 / 格式轉換 -------
 
 @app.command("export-dataset")
 def export_dataset_cmd(
@@ -401,7 +401,7 @@ def export_dataset_cmd(
             console.print(f"  {k}: {v}")
         return
 
-    # temporal 配對：frame-pairs / clip（v1.2 落點按專案分層；無 -P → _global）
+    # temporal 配對：frame-pairs / clip（落點按專案分層；無 -P → _global）
     run_dir = export_common.exports_dir(project) / export_common.next_run_id(project)
     run_dir.mkdir(parents=True, exist_ok=True)
     try:

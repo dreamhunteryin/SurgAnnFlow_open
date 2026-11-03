@@ -1,4 +1,4 @@
-"""derive（M1）：interval 標註 → 每 5s/30s（任意間隔）frame-level label。
+"""derive：interval 標註 → 每 5s/30s（任意間隔）frame-level label。
 
 抽樣點 label 不由人標，由 interval 推導；間隔可事後任意調整——
 換個 intervals 設定重跑即可，不需重標。
@@ -38,7 +38,7 @@ def derive_frame_labels(intervals_by_layer: dict[str, list[dict]],
     """單一抽樣間隔的推導。video_meta: video_id -> {fps, n_frames}。"""
     out: list[dict] = []
     # (video, layer, annotator, project) 分組——每位標註者獨立一份推導結果
-    # v1.2 加 project 隔離（interval 列無 project_id 時歸 ""）
+    # 按 project 隔離（interval 列無 project_id 時歸 ""）
     groups: dict[tuple[str, str, str, str], list[dict]] = {}
     for layer, rows in intervals_by_layer.items():
         for r in rows:

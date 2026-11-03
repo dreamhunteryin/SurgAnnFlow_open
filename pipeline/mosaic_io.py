@@ -152,7 +152,7 @@ def import_mosaic(json_path, video_id: str, db_path=None,
 
     video_id 必須已存在於 videos 表（需要 width/height 做座標換算）。
 
-    v1.2 追溯 ID：來源 JSON 的 extra.project_id / extra.annotator（我方
+    追溯 ID：來源 JSON 的 extra.project_id / extra.annotator（我方
     export_mosaic round-trip 產物）優先讀回；缺欄時 project 用 CLI 指定的
     project_id（再缺退 default），annotator 用參數顯示名並經
     get_or_create_annotator 建冊。寫入一律走 registry.add_annotation

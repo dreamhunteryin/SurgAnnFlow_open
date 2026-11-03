@@ -1,4 +1,4 @@
-"""統一資料集匯出入口（M3）：spatial 標註 + 對應 images 的三種下載格式。
+"""統一資料集匯出入口：spatial 標註 + 對應 images 的三種下載格式。
 
 供 SurgAnn Annotator server.py 接線的**跨區契約**：
   - `run_dataset_export` — 全量匯出（spatial + images，三格式）
@@ -7,7 +7,7 @@
 每種格式都把「對應 images」與標註一起輸出到 run_dir（可選打包成 zip），
 下載即自帶影像、不需回頭找 data/frames/。
 
-複用既有實作（R4，不重寫抽幀 / COCO 組裝 / YOLO 轉換 / MOSaiC 互轉）：
+複用既有實作（單一實作，不重寫抽幀 / COCO 組裝 / YOLO 轉換 / MOSaiC 互轉）：
   - yolo   → convert.to_yolo（images/ + labels/ + labels_seg/ + data.yaml 已自帶影像）
   - coco   → export_spatial.{rows_from_registry, spatial_label_order, build_coco,
              check_coco_invariants}；影像以 convert._ensure_image 落地 run_dir/coco/images/
@@ -279,7 +279,7 @@ def _select_annotations(conn, project_id: str, *, scope: str,
     """
     rows = [dict(r) for r in conn.execute(
         "SELECT ann_id, video_id, layer, label, start_frame, end_frame "
-        "FROM annotations WHERE project_id = ? "        # v1.2 按專案直查
+        "FROM annotations WHERE project_id = ? "        # 按專案直查
         "ORDER BY video_id, layer, start_frame", (project_id,))]
 
     gate_iv: Optional[dict[str, list[tuple[int, int]]]] = None
@@ -330,7 +330,7 @@ def export_filtered_dataset(db_path, project_id, out_dir, *,
     參數：
       db_path         registry.db 路徑（None = 預設）
       project_id      專案編碼（必填，查無即 ValueError）
-      out_dir         匯出根目錄（如 config.EXPORTS_DIR）；v1.2 起 zip 實際
+      out_dir         匯出根目錄（如 config.EXPORTS_DIR）；zip 實際
                       落 out_dir/{project_id}/（按專案分層，與 run 目錄同層）
       fmt             'mosaic' | 'coco' | 'yolo'
       include_images  False = 只匯出 label（不抽/不附 images）
@@ -341,7 +341,7 @@ def export_filtered_dataset(db_path, project_id, out_dir, *,
       include_labels  label 名稱或 label_id 清單；None = 全部
 
     篩選為前置步驟：先選出符合條件的標註集合（ann_id），再注入既有
-    MOSaiC / COCO / YOLO 匯出路徑（R4 不重複實作）。參數不合法一律
+    MOSaiC / COCO / YOLO 匯出路徑（不重複實作）。參數不合法一律
     raise ValueError（中文訊息，server 端轉 4xx）。
 
     回傳打包好的 zip 檔完整路徑
@@ -375,7 +375,7 @@ def export_filtered_dataset(db_path, project_id, out_dir, *,
         raise ValueError(f"篩選結果沒有 spatial 標註，無法輸出 {fmt} 資料集。")
     ann_ids = {r["ann_id"] for r in selected}
 
-    out_dir = Path(out_dir) / project_id      # v1.2 按專案分層
+    out_dir = Path(out_dir) / project_id      # 按專案分層
     out_dir.mkdir(parents=True, exist_ok=True)
     run_name = (f"filtered_{fmt}_"
                 f"{datetime.now().strftime('%Y%m%d-%H%M%S')}_{uuid.uuid4().hex[:6]}")

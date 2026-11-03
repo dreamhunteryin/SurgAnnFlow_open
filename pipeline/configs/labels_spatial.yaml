@@ -1,6 +1,6 @@
 # Spatial 標註 taxonomy（草稿；本檔僅作 default 專案的種子，之後以 registry labels 表為準）。
-# CVAT label type 一律 any（同一 label 可用 bbox / polygon / mask / points 標）。
-# 顏色為 CVAT 顯示用（#hex）。
+# label 不限幾何型別（同一 label 可用 bbox / polygon / mask / points 標）。
+# 顏色為標註介面顯示用（#hex）。
 
 project_name: SurgAnn Spatial
 
@@ -33,5 +33,5 @@ labels:
     color: "#dc2626"
 
 task:
-  segment_size: 125   # 每個 job 的影像張數（job 為 CVAT 的指派單位）
+  segment_size: 125   # 每個 job 的影像張數（保留參數，目前無程式讀取）
   image_quality: 95

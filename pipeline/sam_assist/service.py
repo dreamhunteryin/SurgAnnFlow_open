@@ -14,7 +14,7 @@
 
 GPU：device=cuda 時預載 pip nvidia-* wheels 的 CUDA/cuDNN .so（無系統 toolkit），
     Pascal 1080 Ti 實測可用組合見 deploy/requirements-gpu.txt；失敗自動降級 CPU 並記於 status.detail。
-禁用 PyTorch（Pascal 顯卡相容性：新版 PyTorch wheel 已不支援 sm_61）；全參數走 sam.yaml（R5）。
+禁用 PyTorch（Pascal 顯卡相容性：新版 PyTorch wheel 已不支援 sm_61）；全參數走 sam.yaml。
 """
 from __future__ import annotations
 
@@ -273,7 +273,7 @@ class SamService:
             video = registry.get_video(video_id, conn)
         if video is None:
             raise FileNotFoundError(f"registry 內沒有 video_id={video_id}")
-        std_path = config.to_abs(video["std_path"])   # v1.4：相對 data 根 → 絕對
+        std_path = config.to_abs(video["std_path"])   # registry 存相對 data 根 → 轉絕對
         if not std_path or not std_path.exists():
             raise FileNotFoundError(f"標準化影片不存在：{std_path}")
         return video

@@ -1,4 +1,4 @@
-"""spatial 標註匯出（v1.2）：registry annotations(layer='spatial') →
+"""spatial 標註匯出：registry annotations(layer='spatial') →
 全保真 spatial.json + keypoint frames 補抽幀（purpose=manual）+ COCO。
 
 與 export_temporal 同源（registry 直讀，不經平台）；COCO 每張 image 注入
@@ -68,14 +68,14 @@ def ensure_keyframe_images(conn, videos: dict[str, dict],
                            needed: set[tuple[str, int]]) -> int:
     """補抽缺少的 keypoint frame JPEG，並以 purpose='manual' upsert 進 frames 表。
 
-    回傳新抽出的張數。已存在的 JPEG 不重抽（原始影片唯讀不受影響，R9）。
+    回傳新抽出的張數。已存在的 JPEG 不重抽（原始影片唯讀不受影響）。
     """
     n_new = 0
     for vid, frame in sorted(needed):
         v = videos[vid]
         out_path = config.frame_path(vid, frame)
         if not out_path.exists():
-            std_path = config.to_abs(v["std_path"])   # v1.4：registry 存相對 data 根
+            std_path = config.to_abs(v["std_path"])   # schema v1.4：registry 存相對 data 根
             if not std_path or not std_path.exists():
                 raise SpatialExportError(f"標準化影片不存在：{std_path}")
             extract_frame(std_path, v["fps"], frame, out_path)
@@ -98,7 +98,7 @@ def build_coco(rows: list[dict], videos: dict[str, dict],
     images[] 每個唯一 (video_id, keypoint frame) 一張，注入回溯 metadata；
     annotations[] 每個標註 × keypoint 一筆，extra 帶齊追溯 ID
     （ann_id/ann_uid、video_id、project_id、annotator_id、annotator_name）；
-    info 記 project_id（COCO 允許額外 key，v1.2 供後處理按專案/影片/標註者篩選）。
+    info 記 project_id（COCO 允許額外 key，供後處理按專案/影片/標註者篩選）。
     """
     cat_id = {name: i + 1 for i, name in enumerate(labels)}
     categories = [{"id": i + 1, "name": name, "supercategory": ""}
@@ -192,7 +192,7 @@ class SpatialExportOutcome:
 def rows_from_registry(conn, project_id: str | None = None) -> list[dict]:
     """annotations(layer='spatial') → 全保真列（attrs 解開）。
 
-    project_id 給定時以 annotations.project_id 直查（v1.2 標註按專案隔離）。
+    project_id 給定時以 annotations.project_id 直查（標註按專案隔離）。
     每列帶齊追溯 ID：ann_id / video_id / project_id / annotator_id（+ 顯示名）。
     """
     rows = []

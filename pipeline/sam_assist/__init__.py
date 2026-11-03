@@ -9,7 +9,7 @@
                                  # -> {"polygon": [[x,y],...], "score": float}
 
 設計：encoder 每幀跑一次並快取 image embedding，decoder 每次點擊/框選即時推論。
-參數集中於 pipeline/configs/sam.yaml（R5）。
+參數集中於 pipeline/configs/sam.yaml。
 """
 from .service import SamNotReady, SamService, get_service
 

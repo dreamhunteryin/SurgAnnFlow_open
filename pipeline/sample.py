@@ -1,4 +1,4 @@
-"""sample（M2）：依 registry frames 表抽出 JPEG，供 CVAT spatial 標註。
+"""sample：依 registry frames 表抽出 JPEG，供 spatial 標註。
 
 命名規範（全平台強制）：{video_id}_f{frame_index:07d}.jpg
 ——檔名本身攜帶回溯資訊，任何平台匯出後都能還原 video_id + frame_index。
@@ -62,7 +62,7 @@ def sample(video_id: str, purpose: str, jpeg_qv: int = 2, force: bool = False,
     if not indices:
         raise SampleError(f"frames 表沒有 {video_id} / purpose={purpose} 的抽樣點。")
 
-    std_path = config.to_abs(video["std_path"])   # v1.4：相對 data 根 → 絕對
+    std_path = config.to_abs(video["std_path"])   # schema v1.4：相對 data 根 → 絕對
     if not std_path or not std_path.exists():
         raise SampleError(f"標準化影片不存在：{std_path}")
     step = _uniform_step(indices)
@@ -110,5 +110,5 @@ def _write_paths(video_id: str, purpose: str, indices: list[int],
             "UPDATE frames SET path = ? WHERE video_id = ? AND frame_index = ? "
             "AND purpose = ?",
             [(config.to_rel(config.frame_path(video_id, i)), video_id, i, purpose)
-             for i in indices],   # v1.4：frames.path 存相對 data 根
+             for i in indices],   # schema v1.4：frames.path 存相對 data 根
         )

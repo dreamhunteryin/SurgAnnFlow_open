@@ -1,11 +1,11 @@
 """上傳前處理 pipeline：合併 → OOB 偵測 → 切除+標準化（單一 pass）→ 驗證。
 
 核心不變式：
-- 原始影片唯讀（R9）：所有產物落在 workdir，永不改動來源資料夾。
+- 原始影片唯讀：所有產物落在 workdir，永不改動來源資料夾。
 - 單一重編碼：OOB 切除與 720p/25 CFR 標準化在同一個 ffmpeg pass 完成，
   最終編碼參數 = ingest 標準（驗證必過），另補 metadata 全剝（去識別化）。
 - 每階段產物存在即跳過（resume）：merged.mp4 / oob.csv。
-- 驗證重用 ingest.verify（R4）；duration 檢查對 in-body 段總長 ±cfg 容差。
+- 驗證重用 ingest.verify（單一實作）；duration 檢查對 in-body 段總長 ±cfg 容差。
 
 OOB 模型：OOBNet（CAMMA, U. Strasbourg）—— 權重 CC BY-NC-SA 4.0，僅限非商業
 研究使用。推論為 ONNX + onnxruntime，在主 venv 內直接呼叫
@@ -45,7 +45,7 @@ def _run_ffmpeg_progress(cmd: list[str], expected: float,
                          progress_cb: Optional[ProgressCb],
                          err_prefix: str) -> None:
     """執行 ffmpeg 並以 -progress pipe:1 解析 out_time_ms 回報進度
-    （cut_encode / merge / fallback 共用的解析邏輯，R4 單一實作）。
+    （cut_encode / merge / fallback 共用的解析邏輯，單一實作）。
 
     約定：cmd 的最後一個元素必須是輸出路徑，本函式在其前統一插入
     -progress pipe:1；失敗以 err_prefix 開頭 raise PreprocessError。
@@ -171,7 +171,7 @@ def plan_merge(folder: Path, cfg: dict) -> MergePlan:
 def nvenc_available() -> bool:
     """h264_nvenc 是否真的能編碼（以 0.1 秒測試片實跑一次；結果在本程序內快取）。
 
-    encode.encoder=auto 與 merge.fallback_encoder=auto 共用（R4）；doctor 亦呼叫此函式。
+    encode.encoder=auto 與 merge.fallback_encoder=auto 共用（單一實作）；doctor 亦呼叫此函式。
     """
     try:
         r = subprocess.run(
@@ -213,7 +213,7 @@ def merge(plan: MergePlan, workdir: Path, cfg: dict,
     """concat demuxer + stream copy 合併；輸出 duration ratio < 閾值 →
     自動逐段 re-encode fallback 再 concat（損壞 NAL 導致 silent truncation 的救援）。
 
-    單檔（plan.single_file）直接回傳來源路徑，不落地複本（R9 唯讀 OK）。
+    單檔（plan.single_file）直接回傳來源路徑，不落地複本（來源唯讀不受影響）。
     產物 workdir/merged.mp4 已存在即跳過（resume）。
 
     progress_cb：merge stage 內百分比 0–100，保證單調不減。stream copy 依
@@ -443,7 +443,7 @@ def preflight_oob(cfg: dict) -> list[str]:
       2) 已同意 OOB 模型授權（config.oob_license_accepted；deploy/.env OOB_LICENSE_ACCEPTED）
       3) 模型可解析（resolve_oob_model：onnx_path 有設定才用自訂，否則附帶 onnx_bundled）
       4) 附帶模型 sha256 必須等於 onnx_sha256（自訂覆寫檔不符只警告，不列為問題）
-    只做檢查、不執行推論；供 CLI --check、job worker 起 OOB 前、doctor 共用（R4）。
+    只做檢查、不執行推論；供 CLI --check、job worker 起 OOB 前、doctor 共用（單一實作）。
     """
     problems: list[str] = []
     import importlib.util
@@ -475,7 +475,7 @@ def preflight_oob(cfg: dict) -> list[str]:
 
 
 def ensure_oob_ready(cfg: dict) -> None:
-    """preflight_oob 的 raise 版：任何一項不過即以單一、可照抄訊息 raise（R10 薄入口用）。"""
+    """preflight_oob 的 raise 版：任何一項不過即以單一、可照抄訊息 raise（供 CLI 薄入口用）。"""
     problems = preflight_oob(cfg)
     if problems:
         raise PreprocessError(
@@ -577,7 +577,7 @@ def derive_segments(oob_csv: Path, cfg: dict, fps: Optional[float] = None,
                     duration: Optional[float] = None) -> list[tuple[float, float]]:
     """解析 OOB 機率 CSV → 保留的 in-body 段 [(start_sec, end_sec), …]。
 
-    threshold / min_segment_sec / boundary_pad_sec 皆取自 cfg（R5）。
+    threshold / min_segment_sec / boundary_pad_sec 皆取自 cfg（不 hard-code）。
     切除段（OOB）先往外各擴 boundary_pad_sec（隱私優先），再取補集為 in-body，
     短於 min_segment_sec 的 in-body 段視為雜訊丟棄。
 
@@ -661,7 +661,7 @@ def probe_fast_path(video: Path, cfg: dict,
                     segments: Optional[list[tuple[float, float]]] = None) -> bool:
     """已 1280x720 / 25fps 嚴格 CFR h264 且無切割需求 → True（可走 remux fast path）。
 
-    CFR / 解析度 / 幀數判定重用 ingest.verify（R4）——fast path 產物必須能過
+    CFR / 解析度 / 幀數判定重用 ingest.verify（單一實作）——fast path 產物必須能過
     ingest 驗證，這裡先用同一把尺量輸入。
     """
     ecfg = cfg["encode"]
@@ -795,7 +795,7 @@ class PreprocessReport:
 
 def verify_output(final: Path, segments: Optional[list[tuple[float, float]]],
                   cfg: dict) -> PreprocessReport:
-    """輸出 duration ≈ in-body 段總長 ±cfg 容差 ＋ ingest 現行 CFR/幀數檢查（重用，R4）。"""
+    """輸出 duration ≈ in-body 段總長 ±cfg 容差 ＋ ingest 現行 CFR/幀數檢查（重用同一實作）。"""
     ingest_verify_cfg = config.load_config("ingest.yaml")["verify"]
     vr = ingest.verify(final, ingest_verify_cfg)
     problems = list(vr.problems)

@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <title data-i18n="up.title">SurgAnnFlow — 影片入庫</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="style.css?v=20261102-1">
-<script src="i18n.js?v=20261102-1"></script>
+<link rel="stylesheet" href="style.css?v=20261103-1">
+<script src="i18n.js?v=20261103-1"></script>
 </head>
 <body class="landing">
 <header id="topbar">
@@ -18,6 +18,12 @@
 </header>
 
 <main id="landMain">
+
+  <!-- OOB 模型授權未同意提示（不擋其他操作；排入處理佇列時才阻止） -->
+  <div id="oobBanner" class="notice-banner hidden" data-i18n-html="up.oob_banner">
+    影片入庫的去識別化需要先同意 OOB 模型授權（CC BY-NC-SA 4.0，僅限非商業研究）。
+    請在伺服器終端機執行 <code>surgann fetch-models --only oob</code> 閱讀並同意，完成後重新整理本頁。
+  </div>
 
   <!-- ============ 系列管理 ============ -->
   <section class="up-sec" id="series">
@@ -108,7 +114,7 @@
   </section>
 </main>
 
-<!-- 合併順序確認 modal（決策 H：拖曳調序） -->
+<!-- 合併順序確認 modal（拖曳調序） -->
 <div id="orderModal" class="modal-overlay hidden">
   <div class="modal" style="max-width:700px">
     <div class="modal-head"><h2><span data-i18n="up.order_title">確認合併順序 — </span><span id="omFolder"></span></h2>
@@ -297,10 +303,18 @@ async function loadScan() {
 }
 $("scanBtn").onclick = loadScan;
 
-// ================= 合併順序確認（拖曳調序，決策 H） =================
+// ================= 合併順序確認（拖曳調序） =================
 let omFolderData = null, omOrder = [];
-function openOrderModal(f) {
+// OOB 授權狀態：每次即時向後端查（使用者可能剛在終端機同意）；查不到或舊版後端無此欄位 → 不阻擋
+async function checkOobLicense() {
+  let ok = true;
+  try { ok = (await api("GET", "/api/config")).oob_license_accepted !== false; } catch {}
+  $("oobBanner").classList.toggle("hidden", ok);
+  return ok;
+}
+async function openOrderModal(f) {
   if (!$("tgtSeries").value) { alert(t("up.select_series_first")); return; }
+  if (!(await checkOobLicense())) { alert(t("up.oob_block")); return; }
   omFolderData = f;
   omOrder = f.files.map(x => x.name);
   $("omFolder").textContent = f.patient_folder;
@@ -465,7 +479,7 @@ async function loadJobs() {
 async function deleteJob(j) {
   if (!confirm(t("up.confirm_del_job", j.patient_folder))) return;
   let purge = false;
-  if (j.status === "failed")      // 二次確認才帶 purge（R9）
+  if (j.status === "failed")      // 二次確認才帶 purge（刪工作目錄暫存檔屬破壞性操作，需使用者確認）
     purge = confirm(t("up.confirm_purge"));
   try {
     const res = await api("DELETE", `/api/pipeline/jobs/${j.job_id}?purge=${purge}`);
@@ -582,6 +596,7 @@ setInterval(async () => {
 
 (async function () {
   try { projectsList = await api("GET", "/api/projects"); } catch {}
+  checkOobLicense();
   await loadSeries();
   await Promise.all([loadScan(), loadJobs(), loadReclaim()]);
   lastSig = jobList.map(j => `${j.job_id}:${j.status}`).join("|");

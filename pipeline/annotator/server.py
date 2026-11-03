@@ -5,8 +5,8 @@
 - 標註直接讀寫 registry `annotations` 表（單一事實來源），無平台格式轉換層。
 - 只存 frame index；timestamp 一律由 frame / fps 推導。
 - taxonomy 以 registry `projects`/`labels` 表為準（每專案獨立）；
-  pipeline/configs/labels_*.yaml 僅作 default 專案的種子與 triplet 三選單後援（R5）。
-- 身分讀 deploy/.env（R12）；原始影片唯讀（R9）。
+  pipeline/configs/labels_*.yaml 僅作 default 專案的種子與 triplet 三選單後援。
+- 身分讀 deploy/.env（帳密不寫進程式碼）；原始影片唯讀。
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ class AnnotationIn(BaseModel):
     end_frame: int = Field(ge=0)
     attrs: Optional[dict] = None
     ann_id: Optional[str] = None     # 前端 undo 重建用：有給且不衝突則沿用原 id
-    project_id: Optional[str] = None  # v1.2 必填（標註按專案隔離）；缺 → 422
+    project_id: Optional[str] = None  # 必填（標註按專案隔離）；缺 → 422
     annotator: Optional[str] = None   # 顯示名；server 以 get_or_create_annotator 換 ID
 
 
@@ -118,7 +118,7 @@ class LabelsImportIn(BaseModel):
 class IngestIn(BaseModel):
     filename: str                    # data/raw_videos/ 內的檔名（不含路徑）
     project_id: str = registry.DEFAULT_PROJECT_ID
-    series_id: Optional[str] = None  # v1.3：掃碟入庫選 series 後由 next_video_id 配號
+    series_id: Optional[str] = None  # 掃碟入庫選 series 後由 next_video_id 配號
     video_id: Optional[str] = None   # 相容舊呼叫；未給時必須給 series_id 自動配號
 
 
@@ -131,7 +131,7 @@ class ProjectVideoIn(BaseModel):
 
 
 class ImportSeriesIn(BaseModel):
-    series: str                      # series_id（v1.3 起 videos.series 存 series_id）
+    series: str                      # series_id（videos.series 存的是 series_id）
 
 
 class VideoPatch(BaseModel):
@@ -157,7 +157,7 @@ class PipelineJobIn(BaseModel):
     patient_folder: str              # data/raw_videos/_incoming/ 下的相對路徑
     series_id: str
     project_id: Optional[str] = None  # 可選：入庫完成後順掛標註專案
-    params: Optional[dict] = None     # {"file_order": [...], "surgery_date": "..."}（決策 H）
+    params: Optional[dict] = None     # {"file_order": [...], "surgery_date": "..."}（使用者確認的合併順序）
 
 
 class ConfirmOobIn(BaseModel):
@@ -296,7 +296,7 @@ def _jobs_call(fn, *args, **kwargs):
 def create_app() -> FastAPI:
     env = config.load_env()
     annotator_name = env.get("ANNOTATOR_NAME", "annotator1")
-    # triplet 三選單後援（專案 extra_json 無 triplet 設定時沿用 yaml，R5）
+    # triplet 三選單後援（專案 extra_json 無 triplet 設定時沿用 yaml）
     triplet_fallback = config.load_config("labels_temporal.yaml").get("triplet", {})
 
     registry.init_db()
@@ -365,7 +365,7 @@ def create_app() -> FastAPI:
         return tax
 
     def _project_of_video(conn, video_id: str) -> str:
-        """影片的「代表」專案：播放清單第一個（v1.2 多對多），退回 default。
+        """影片的「代表」專案：播放清單第一個（影片與專案為多對多），退回 default。
         僅供未帶 project 參數的舊呼叫相容；新前端一律明確帶 project。"""
         video = registry.get_video(video_id, conn)
         if video is None:
@@ -380,7 +380,9 @@ def create_app() -> FastAPI:
 
     @app.get("/api/config")
     def get_config(project: Optional[str] = None, video: Optional[str] = None):
-        """依專案回傳 taxonomy；?video= 由影片反查專案；無參數 = default 專案。"""
+        """依專案回傳 taxonomy；?video= 由影片反查專案；無參數 = default 專案。
+        oob_license_accepted：是否已同意 OOB 模型授權（入庫頁據此提示；每次即時讀取，
+        使用者在終端機同意後重新整理頁面即生效）。"""
         with registry.connect() as conn:
             pid = project
             if video:
@@ -388,7 +390,8 @@ def create_app() -> FastAPI:
             pid = pid or registry.DEFAULT_PROJECT_ID
             taxonomy = _taxonomy_for(conn, pid)
         return {"taxonomy": taxonomy, "layers": list(LAYERS),
-                "annotator": annotator_name, "project": pid}
+                "annotator": annotator_name, "project": pid,
+                "oob_license_accepted": config.oob_license_accepted()}
 
     @app.post("/api/labels")
     def add_label(body: LabelIn):
@@ -481,7 +484,7 @@ def create_app() -> FastAPI:
     def _project_dict(conn, row) -> dict:
         d = dict(row)
         d.pop("extra_json", None)
-        d["n_videos"] = conn.execute(   # v1.2：專案影片數 = 播放清單列數
+        d["n_videos"] = conn.execute(   # 專案影片數 = 播放清單列數
             "SELECT COUNT(*) AS n FROM project_videos WHERE project_id = ?",
             (row["project_id"],)).fetchone()["n"]
         return d
@@ -579,9 +582,9 @@ def create_app() -> FastAPI:
         d["group_name"] = d.get("group_name") or "default"
         d["series"] = d.get("series") or ""
         d["projects"] = registry.video_projects(conn, r["video_id"])
-        d.pop("project_id", None)   # v1.2 停用欄位，不再對外
-        d.pop("source_path", None)  # v1.3 PHI 收斂：原始路徑不對外
-        if d.get("std_path"):       # v1.4 registry 存相對 data 根；對外維持絕對路徑（契約 #2 不變）
+        d.pop("project_id", None)   # 已停用欄位，不再對外
+        d.pop("source_path", None)  # PHI 收斂：原始路徑不對外
+        if d.get("std_path"):       # registry 存相對 data 根；對外維持絕對路徑（API 回傳格式不變）
             d["std_path"] = str(config.to_abs(d["std_path"]))
         if project_id is not None:
             d["n_annotations"] = registry.count_annotations(
@@ -633,7 +636,7 @@ def create_app() -> FastAPI:
     def remove_project_video(project_id: str, video_id: str, confirm: bool = False):
         """把影片移出專案播放清單。該專案在此片有標註時：
         未帶 confirm → 409 附 n_annotations（前端跳警告）；
-        confirm=1 → 連同該專案的標註一併刪除（其他專案不受影響，R9 已確認）。"""
+        confirm=1 → 連同該專案的標註一併刪除（其他專案不受影響；原始影片檔不會被刪）。"""
         with registry.connect() as conn:
             _get_project_or_404(conn, project_id)
             if registry.get_video(video_id, conn) is None:
@@ -661,7 +664,7 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/videos/{video_id}")
     def patch_video(video_id: str, body: VideoPatch):
-        """改影片庫層級屬性（目前僅 series；v1.3 起值必須是既有 series_id）。"""
+        """改影片庫層級屬性（目前僅 series；值必須是既有 series_id）。"""
         with registry.connect() as conn:
             if registry.get_video(video_id, conn) is None:
                 raise HTTPException(404, f"video {video_id} 不存在")
@@ -767,9 +770,9 @@ def create_app() -> FastAPI:
 
     @app.get("/api/raw-scan")
     def raw_scan(project: Optional[str] = None):
-        """掃描 data/raw_videos/（唯讀，R9），回報每個檔案是否已入庫。
+        """掃描 data/raw_videos/（唯讀），回報每個檔案是否已入庫。
         ?project= 給定時每列另附 in_project（該影片是否已在此專案清單）。
-        v1.3：不再建議 caseNNN——video_id 於入庫時依所選 series 由
+        不建議 caseNNN 式命名——video_id 於入庫時依所選 series 由
         registry.next_video_id 自動配號（{seriesID}_{NNNN}）。"""
         with registry.connect() as conn:
             if project is not None:
@@ -837,7 +840,7 @@ def create_app() -> FastAPI:
                     raise HTTPException(422, "video_id 只能用英數、-、_")
                 if registry.get_video(video_id, conn) is not None:
                     raise HTTPException(409, f"video_id {video_id} 已存在")
-            else:                                    # v1.3：依 series 自動配號
+            else:                                    # 依 series 自動配號
                 if not series_id:
                     raise HTTPException(422, "請先選擇系列（series_id）——"
                                              "video_id 依系列自動配號")
@@ -853,14 +856,14 @@ def create_app() -> FastAPI:
         return {"ok": True, "status": "running", "filename": filename,
                 "video_id": video_id}
 
-    # --------------------------------- 上傳入庫 pipeline（v1.3）--------------
+    # --------------------------------- 上傳入庫 pipeline -------------------
     # 流程：_incoming/ 病人資料夾（掃碟或瀏覽器上傳落地）→ incoming-scan 排序預覽
     # → 人工確認順序 enqueue → worker（merge→oob→[QC]→cut_encode→verify→register）。
     # ★ deid_map 內容絕不經任何 API 回傳（PHI）。
 
     @app.get("/api/incoming-scan")
     def incoming_scan():
-        """掃 data/raw_videos/_incoming/ 的病人資料夾（唯讀，R9）。
+        """掃 data/raw_videos/_incoming/ 的病人資料夾（唯讀）。
 
         每夾回傳 plan_merge 排序預覽（檔名/順序/大小/duration、單檔免合併旗標）、
         mtime 第二意見警告、進行中 job。支援兩層結構：
@@ -1134,7 +1137,7 @@ def create_app() -> FastAPI:
                 (run_id,)).fetchone()
         if row is None:
             raise HTTPException(404, f"export run {run_id} 不存在")
-        run_dir = config.to_abs(row["run_dir"])   # v1.4：相對 data 根 → 絕對
+        run_dir = config.to_abs(row["run_dir"])   # registry 存相對 data 根 → 轉絕對
         if not run_dir or not run_dir.is_dir():
             # 容錯：舊 run 已搬進 legacy/（部分 DB 列可能未同步更新）
             run_dir = config.LEGACY_EXPORTS_DIR / run_id
@@ -1358,7 +1361,7 @@ def create_app() -> FastAPI:
             if not registry.delete_annotation(conn, ann_id, project_id=project):
                 raise HTTPException(404, "annotation 不存在")
 
-    # 影片串流（StaticFiles 原生支援 byte-range）；唯讀來源目錄（R9 不受影響）
+    # 影片串流（StaticFiles 原生支援 byte-range）；來源目錄唯讀，不受影響
     app.mount("/media", StaticFiles(directory=config.VIDEOS_DIR), name="media")
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
     return app

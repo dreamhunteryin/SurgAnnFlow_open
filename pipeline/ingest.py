@@ -1,7 +1,7 @@
 """影片 ingest：標準化轉檔 → 驗證 → 入庫 → 抽樣點註冊。
 
 核心不變式：
-- 原始影片唯讀，永不修改（R9）。
+- 原始影片唯讀，永不修改。
 - CFR 25fps 是 frame/timestamp 正確性的基石；驗證不過即擋下，不入庫。
 """
 from __future__ import annotations
@@ -217,7 +217,7 @@ def register_video(std_path: Path, video_id: str, cfg: dict, *,
         if on_step:
             on_step(msg)
 
-    # 一律轉絕對再交給 registry（registry 寫入時以 config.to_rel 轉 v1.4 相對路徑；
+    # 一律轉絕對再交給 registry（registry 寫入時以 config.to_rel 轉 schema v1.4 相對路徑；
     # 若此處留 cwd 相對值會被誤認成「已是相對 data 根」）
     std_path = Path(os.path.abspath(std_path))
     if not std_path.exists():
@@ -247,7 +247,7 @@ def register_video(std_path: Path, video_id: str, cfg: dict, *,
         registry.upsert_video(
             conn,
             video_id=video_id,
-            source_path=source_path,      # registry.upsert_video 自動 to_rel（v1.4）
+            source_path=source_path,      # registry.upsert_video 自動 to_rel（schema v1.4）
             std_path=str(std_path),
             fps=vr.fps,
             n_frames=vr.n_frames,
@@ -270,7 +270,7 @@ def register_video(std_path: Path, video_id: str, cfg: dict, *,
 
 def ingest(src: Path, video_id: str, cfg: dict, db_path=None, force: bool = False,
            on_step=None) -> IngestOutcome:
-    """單支影片完整 ingest：轉檔 → register_video。src 唯讀，永不修改（R9）。"""
+    """單支影片完整 ingest：轉檔 → register_video。src 唯讀，永不修改。"""
 
     def step(msg: str):
         if on_step:

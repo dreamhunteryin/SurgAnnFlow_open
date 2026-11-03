@@ -1,4 +1,4 @@
-"""專案路徑與設定載入（單一來源，避免各處 hard-code 路徑 — R5）。
+"""專案路徑與設定載入（單一來源，避免各處 hard-code 路徑）。
 
 data 根可搬：
   DATA_DIR 解析順序（先找到先用）：
@@ -43,7 +43,7 @@ _deprecated_warned: set[str] = set()
 
 
 def load_env(path: Path | None = None) -> dict[str, str]:
-    """讀 deploy/.env（KEY=VALUE，支援 # 註解）。祕密只存這裡（R12），不進版控。
+    """讀 deploy/.env（KEY=VALUE，支援 # 註解）。祕密只存這裡，不進版控。
 
     已淘汰的鍵（DEPRECATED_ENV_KEYS）不回傳，並於 stderr 提示一次。
     """
@@ -99,7 +99,7 @@ FRAMES_DIR = DATA_DIR / "frames"
 EXPORTS_DIR = DATA_DIR / "exports"
 MODELS_DIR = DATA_DIR / "models"      # 模型檔（models/sam/、models/oob/；不進 git）
 CACHE_DIR = DATA_DIR / "cache"        # SAM embedding 等可重算快取
-# v1.2 起新匯出按專案分層：data/exports/{project_id}/{run_id}/（由匯出模組建立）。
+# 新匯出按專案分層：data/exports/{project_id}/{run_id}/（由匯出模組建立）。
 # 播放清單模式上線前的舊 run 全部歸檔於此（只搬不刪）。
 LEGACY_EXPORTS_DIR = EXPORTS_DIR / "legacy"
 
@@ -132,7 +132,7 @@ def to_rel(path: Optional[PathLike], base: Optional[Path] = None) -> Optional[st
     - None / 空字串 → 原樣回傳（欄位允許空）。
     - 在 data 根內 → 相對 POSIX 字串（如 `videos/ABCD_0001/ABCD_0001.mp4`；data 根本身 → `.`）。
     - 在 data 根外 → 原樣絕對字串（POSIX 分隔）。
-    - 已是相對 → 視為已是 v1.4 儲存值，正規化為 POSIX 後回傳（冪等：to_rel(to_rel(x)) == to_rel(x)）。
+    - 已是相對 → 視為已是 schema v1.4 儲存值，正規化為 POSIX 後回傳（冪等：to_rel(to_rel(x)) == to_rel(x)）。
     base：測試注入用；預設 DATA_DIR。
     """
     if path is None or str(path) == "":
@@ -148,7 +148,7 @@ def to_abs(stored: Optional[PathLike], base: Optional[Path] = None) -> Optional[
     """讀出 registry 後呼叫：儲存值 → 絕對 Path。
 
     - 相對 → 接上 data 根（DATA_DIR / stored）。
-    - 已是絕對（v1.3 舊值或 data 根外路徑）→ 原樣 Path（不改寫、不檢查存在）。
+    - 已是絕對（schema v1.3 舊值或 data 根外路徑）→ 原樣 Path（不改寫、不檢查存在）。
     - None / 空字串 → 原樣回傳（不報錯）。
     base：測試注入用；預設 DATA_DIR。
     """

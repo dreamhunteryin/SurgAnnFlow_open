@@ -1,9 +1,9 @@
-"""surgann backup（M3）：registry.db + 可攜標註快照 → backups/，可 rsync。
+"""surgann backup：registry.db + 可攜標註快照 → backups/，可 rsync。
 
-R13：動 registry schema、大規模重構、任何破壞性操作之前先跑本備份。
-（2026-07-23 移除 LS/CVAT 堆疊後，registry.db 即唯一標註來源，不再有平台 DB dump。）
+動 registry schema、大規模重構、任何破壞性操作之前先跑本備份。
+registry.db 是標註的唯一來源，沒有第二份資料庫可回頭。
 原則：
-- 只讀 registry；永不修改（更不碰 data/raw_videos，R9）。
+- 只讀 registry；永不修改（更不碰 data/raw_videos，原始影片唯讀）。
 - 標註快照為平台外、可攜的 JSON dump（不依賴 SQLite/平台版本）——第二階段搬 NAS 的保險。
 - 絕不刪既有備份；每次備份自成一個時間戳目錄。
 """
@@ -37,8 +37,8 @@ class BackupOutcome:
 def _dump_sqlite(db_path: Path) -> dict:
     """把 registry 所有表匯成可攜 JSON（table -> list[row dict]）。
 
-    動態列舉 sqlite_master，故 v1.3 新表（series/pipeline_jobs/deid_map/id_history）
-    自動納入。注意：deid_map 含 PHI——backups/ 已 gitignore（R8），
+    動態列舉 sqlite_master，故後來新增的表（series/pipeline_jobs/deid_map/id_history）
+    自動納入。注意：deid_map 含 PHI——backups/ 已 gitignore，
     備份檔不得外流或進版控。
     """
     out: dict[str, list[dict]] = {}

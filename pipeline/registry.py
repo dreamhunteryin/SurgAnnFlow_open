@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS videos (
     series        TEXT                    -- 手術類型/系列（如 ABCD、EFGH）
 );
 
--- v1.2 播放清單模式：影片入庫一次，專案引用不複製（多對多）。
+-- 播放清單模式：影片入庫一次，專案引用不複製（多對多）。
 -- videos.project_id 欄位已停用（僅保留避免 SQLite drop column 麻煩），一律走此表。
 CREATE TABLE IF NOT EXISTS project_videos (
     project_id TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS project_videos (
     PRIMARY KEY (project_id, video_id)
 );
 
--- v1.2 標註者名冊：annotator_id 為連號 slug（u001, u002, …）
+-- 標註者名冊：annotator_id 為連號 slug（u001, u002, …）
 CREATE TABLE IF NOT EXISTS annotators (
     annotator_id TEXT PRIMARY KEY,
     name         TEXT NOT NULL UNIQUE,
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS export_runs (
     created_at  TEXT
 );
 
--- v1.3：series 資產層（入庫分群，非標註專案）。
+-- series 資產層（入庫分群，非標註專案）。
 -- series_id 為隨機四碼大寫英文（^[A-Z]{4}$）；影片數量＝COUNT 衍生值，不落欄位。
 -- 遷移後 videos.series 欄位改存 series_id（不再是自由文字）。
 CREATE TABLE IF NOT EXISTS series (
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS series (
     updated_at   TEXT NOT NULL            -- 加/移除影片、改 metadata 時更新
 );
 
--- v1.3：上傳入庫 pipeline 工作佇列（單 worker serial queue）
+-- 上傳入庫 pipeline 工作佇列（單 worker serial queue）
 CREATE TABLE IF NOT EXISTS pipeline_jobs (
     job_id         TEXT PRIMARY KEY,      -- uuid
     patient_folder TEXT NOT NULL,         -- _incoming 下的相對路徑
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS pipeline_jobs (
     updated_at     TEXT NOT NULL
 );
 
--- v1.3：videoID ↔ 原始影片對照（PHI 收斂處）。★ API 永不回傳本表內容。
+-- videoID ↔ 原始影片對照（PHI 收斂處）。★ API 永不回傳本表內容。
 CREATE TABLE IF NOT EXISTS deid_map (
     video_id             TEXT PRIMARY KEY,
     series_id            TEXT NOT NULL,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS deid_map (
     created_at           TEXT NOT NULL
 );
 
--- v1.3：ID 變更史（改 ID 為罕見管理操作；已匯出資料集靠此回溯）
+-- ID 變更史（改 ID 為罕見管理操作；已匯出資料集靠此回溯）
 CREATE TABLE IF NOT EXISTS id_history (
     old_id     TEXT,
     new_id     TEXT,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS id_history (
     changed_at TEXT
 );
 
--- v1.1：自建 annotator 的 temporal 標註。時間永遠由 frame 推導，不落地秒數。
+-- 自建 annotator 的 temporal 標註。時間永遠由 frame 推導，不落地秒數。
 CREATE TABLE IF NOT EXISTS annotations (
     ann_id      TEXT PRIMARY KEY,          -- uuid
     video_id    TEXT NOT NULL,
@@ -181,8 +181,8 @@ CREATE TABLE IF NOT EXISTS annotations (
     annotator   TEXT NOT NULL,             -- 顯示名（歷史欄位；正式身分見 annotator_id）
     created_at  TEXT,
     updated_at  TEXT,
-    project_id   TEXT,                     -- v1.2 標註按專案隔離（必帶；migration 回填舊資料）
-    annotator_id TEXT,                     -- v1.2 → annotators.annotator_id（必帶；migration 回填）
+    project_id   TEXT,                     -- 標註按專案隔離（必帶；migration 回填舊資料）
+    annotator_id TEXT,                     -- → annotators.annotator_id（必帶；migration 回填）
     FOREIGN KEY (video_id) REFERENCES videos(video_id)
 );
 CREATE INDEX IF NOT EXISTS idx_annotations_video ON annotations(video_id);
@@ -217,7 +217,7 @@ for _t, _c in PATH_COLUMNS:
 
 
 def _rel_fields(table: str, fields: dict) -> dict:
-    """把 fields 中屬於該表路徑欄位的值轉成 v1.4 儲存形式（config.to_rel；冪等）。"""
+    """把 fields 中屬於該表路徑欄位的值轉成 schema v1.4 儲存形式（config.to_rel；冪等）。"""
     cols = _PATH_FIELDS.get(table, frozenset())
     return {k: (config.to_rel(v) if k in cols else v) for k, v in fields.items()}
 
@@ -279,7 +279,7 @@ def _init_schema_version(conn: sqlite3.Connection) -> None:
 
     - 全新庫（6 個路徑欄位所在的表皆無資料）→ 直接記 SCHEMA_VERSION（1.4）。
     - 既有庫 → 記 1.3：路徑仍是絕對值，需跑
-      `python -m pipeline.migrations.m20261102_relative_paths`（先 surgann backup，R13）才升 1.4。
+      `python -m pipeline.migrations.m20261102_relative_paths`（先 surgann backup）才升 1.4。
     """
     if get_meta(conn, "schema_version") is not None:
         return
@@ -291,7 +291,7 @@ def _init_schema_version(conn: sqlite3.Connection) -> None:
 def _migrate(conn: sqlite3.Connection) -> None:
     """輕量欄位遷移（既有 DB 補新欄位，冪等）。
 
-    v1.2 播放清單模式：
+    播放清單模式：
     - videos.series（一次性以檔名前綴回填）
     - annotations.project_id / annotator_id（回填舊資料；新寫入由 add_annotation 強制）
     - project_videos 由既有 videos.project_id 一次性播種；之後 videos.project_id 停用
@@ -401,7 +401,7 @@ def _seed_default_project(conn: sqlite3.Connection) -> None:
         for l in spatial_labels:
             add_label(conn, DEFAULT_PROJECT_ID, "spatial", l["name"],
                       color=l.get("color"))
-    # v1.2 起不再回填 videos.project_id（欄位停用）：
+    # 不再回填 videos.project_id（欄位停用）：
     # 影片與專案的關係一律由 project_videos 表維護（ingest --project / API 加入清單）。
 
 
@@ -497,7 +497,7 @@ def delete_label(conn: sqlite3.Connection, label_id: str,
     return n
 
 
-# ------------------------------------- project_videos（v1.2 播放清單模式）----
+# ------------------------------------------ project_videos（播放清單模式）----
 
 def add_video_to_project(conn: sqlite3.Connection, project_id: str,
                          video_id: str) -> None:
@@ -525,7 +525,7 @@ def video_projects(conn: sqlite3.Connection, video_id: str) -> list[str]:
 
 
 def set_video_project(conn: sqlite3.Connection, video_id: str, project_id: str) -> None:
-    """DEPRECATED（v1.2）：改用 add_video_to_project()。
+    """DEPRECATED：改用 add_video_to_project()。
 
     保留簽名避免舊呼叫點瞬間爆炸；內部已改寫 project_videos（不再寫
     videos.project_id）。語意差異：不會把影片移出其他專案。
@@ -534,7 +534,7 @@ def set_video_project(conn: sqlite3.Connection, video_id: str, project_id: str) 
 
 
 # ------------------------------------------------------------- series -------
-# v1.3：series 為資產層獨立表。videos.series 欄位存 series_id。
+# series 為資產層獨立表。videos.series 欄位存 series_id。
 
 def _new_series_code(conn: sqlite3.Connection) -> str:
     """產生未使用的隨機四碼大寫英文 seriesID（查重重抽）。"""
@@ -647,7 +647,7 @@ def upsert_deid_map(conn: sqlite3.Connection, **fields) -> None:
     """以 video_id 為主鍵 upsert 一筆去識別化對照（★ API 永不回傳本表內容）。"""
     if "created_at" not in fields:
         fields["created_at"] = _now_iso()
-    fields = _rel_fields("deid_map", fields)   # oob_csv_path → 相對 data 根（v1.4）
+    fields = _rel_fields("deid_map", fields)   # oob_csv_path → 相對 data 根（schema v1.4）
     cols = list(fields.keys())
     placeholders = ", ".join("?" for _ in cols)
     updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c != "video_id")
@@ -657,7 +657,7 @@ def upsert_deid_map(conn: sqlite3.Connection, **fields) -> None:
         [fields[c] for c in cols])
 
 
-# ------------------------------------------- pipeline_jobs（v1.3 佇列）------
+# ------------------------------------------------ pipeline_jobs（佇列）------
 # 最小存取層：worker/API 一律經由這些 helpers 讀寫（params/artifacts 的
 # JSON 序列化與狀態機邏輯在 pipeline/jobs.py，此處只管列存取）。
 
@@ -719,7 +719,7 @@ def get_video(video_id: str, conn: sqlite3.Connection) -> Optional[sqlite3.Row]:
 
 
 def upsert_video(conn: sqlite3.Connection, **fields) -> None:
-    """以 video_id 為主鍵 upsert 一筆影片記錄。std_path / source_path 自動轉 v1.4 相對路徑。"""
+    """以 video_id 為主鍵 upsert 一筆影片記錄。std_path / source_path 自動轉 schema v1.4 相對路徑。"""
     fields = _rel_fields("videos", fields)
     cols = list(fields.keys())
     placeholders = ", ".join("?" for _ in cols)
@@ -734,7 +734,7 @@ def upsert_video(conn: sqlite3.Connection, **fields) -> None:
 def replace_frames(conn: sqlite3.Connection, video_id: str, rows: Iterable[dict]) -> int:
     """重寫某影片的 frames 抽樣點（先刪後插，確保重跑冪等）。回傳寫入列數。"""
     conn.execute("DELETE FROM frames WHERE video_id = ?", (video_id,))
-    rows = [_rel_fields("frames", dict(r)) for r in rows]   # path → 相對 data 根（v1.4）
+    rows = [_rel_fields("frames", dict(r)) for r in rows]   # path → 相對 data 根（schema v1.4）
     conn.executemany(
         "INSERT INTO frames (video_id, frame_index, time_sec, path, purpose) "
         "VALUES (:video_id, :frame_index, :time_sec, :path, :purpose)",
@@ -783,7 +783,7 @@ def find_task(conn: sqlite3.Connection, platform: str, video_id: str,
 
 def add_snapshot(conn: sqlite3.Connection, **fields) -> None:
     """記錄一次標註快照（每次匯出的原始 JSON 存檔 → versioning）。
-    raw_json_path 自動轉 v1.4 相對路徑。"""
+    raw_json_path 自動轉 schema v1.4 相對路徑。"""
     fields = _rel_fields("annotation_snapshots", fields)
     cols = list(fields.keys())
     conn.execute(
@@ -795,7 +795,7 @@ def add_snapshot(conn: sqlite3.Connection, **fields) -> None:
 
 def add_export_run(conn: sqlite3.Connection, run_id: str, run_dir: str,
                    config_json: str, created_at: str) -> None:
-    """記錄一次匯出 run。run_dir 自動轉 v1.4 相對路徑（呼叫端給絕對或相對皆可）。"""
+    """記錄一次匯出 run。run_dir 自動轉 schema v1.4 相對路徑（呼叫端給絕對或相對皆可）。"""
     run_dir = config.to_rel(run_dir)
     conn.execute(
         "INSERT INTO export_runs (run_id, run_dir, config_json, created_at) "
@@ -809,7 +809,7 @@ def latest_export_run(conn: sqlite3.Connection) -> Optional[sqlite3.Row]:
     return cur.fetchone()
 
 
-# ----------------------------------------------- annotators（v1.2 名冊）-----
+# ---------------------------------------------------- annotators（名冊）-----
 
 def list_annotators(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return list(conn.execute("SELECT * FROM annotators ORDER BY annotator_id"))
@@ -832,11 +832,11 @@ def get_or_create_annotator(conn: sqlite3.Connection, name: str) -> str:
     return annotator_id
 
 
-# ------------------------------------------------- annotations（v1.1）----
+# ------------------------------------------------------- annotations ----
 
 def list_annotations(conn: sqlite3.Connection, video_id: str,
                      project_id: Optional[str] = None) -> list[sqlite3.Row]:
-    """列某影片標註；給 project_id 時只回該專案的（v1.2 按專案隔離）。"""
+    """列某影片標註；給 project_id 時只回該專案的（按專案隔離）。"""
     if project_id is None:
         return list(conn.execute(
             "SELECT * FROM annotations WHERE video_id = ? "
@@ -860,7 +860,7 @@ def get_annotation(conn: sqlite3.Connection, ann_id: str,
 
 def insert_annotation(conn: sqlite3.Connection, **fields) -> None:
     """低階 raw insert（舊介面，保留相容）。新程式請改用 add_annotation()：
-    v1.2 起每筆標註必須帶 project_id 與 annotator_id。"""
+    每筆標註必須帶 project_id 與 annotator_id。"""
     cols = list(fields.keys())
     conn.execute(
         f"INSERT INTO annotations ({', '.join(cols)}) "
@@ -877,7 +877,7 @@ def add_annotation(conn: sqlite3.Connection, *, video_id: str, project_id: str,
                    ann_id: Optional[str] = None,
                    created_at: Optional[str] = None,
                    updated_at: Optional[str] = None) -> str:
-    """新增一筆標註（v1.2 契約：project_id 與 annotator_id 必填）。回傳 ann_id。
+    """新增一筆標註（契約：project_id 與 annotator_id 必填）。回傳 ann_id。
 
     annotator（顯示名）未給時自動由 annotators 名冊反查。
     """
@@ -911,7 +911,7 @@ def count_annotations(conn: sqlite3.Connection, video_id: str,
 def delete_annotations(conn: sqlite3.Connection, video_id: str,
                        project_id: str) -> int:
     """刪除某影片在某專案內的全部標註（「移出專案並連同刪除」用；破壞性，
-    呼叫端必須先取得使用者確認 — R9）。回傳刪除筆數。"""
+    呼叫端必須先取得使用者確認）。回傳刪除筆數。"""
     cur = conn.execute(
         "DELETE FROM annotations WHERE video_id = ? AND project_id = ?",
         (video_id, project_id))

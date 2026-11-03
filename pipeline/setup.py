@@ -1,16 +1,16 @@
 """可攜安裝三件套：`surgann doctor` / `surgann setup` / `surgann fetch-models`。
 
-cli.py 只做薄入口註冊（R10），所有邏輯在這裡。設計原則：
+cli.py 只做薄入口註冊，所有邏輯在這裡。設計原則：
 
 - **程式本身從不執行 sudo**：需要 root 的步驟（安裝 systemd unit）只「印出」指令，交給人或 agent 執行。
 - **輸出要讓 AI agent 好解析**：doctor 有 `--json`，每項固定欄位 id/status/detail/fix；
   任一 FAIL（阻斷項）→ 結束碼 1。
 - **不改既有設定**：setup 寫 `deploy/.env` 時保留所有既有鍵、值與註解，只補缺的（除非 `--force`）。
-- **設定值執行期讀取**（R5）：data 根取 `config.DATA_DIR`；模型路徑、下載網址、sha256 取 yaml。
+- **設定值執行期讀取**（不 hard-code）：data 根取 `config.DATA_DIR`；模型路徑、下載網址、sha256 取 yaml。
 - **OOB 模型隨 repo 附帶**（`pipeline/models/oob/`）：fetch-models 對 OOB 只驗檔＋記錄授權同意，
   同意必須是使用者本人（寫入 `deploy/.env` 的 `OOB_LICENSE_ACCEPTED`）。
 
-白話小辭典（R0）：
+白話小辭典：
 - sha256：檔案的「指紋」。下載完重算一次，和公布的值一樣就代表檔案完整沒被竄改。
 - 續傳：下載中斷時保留已下載的部分（`.part` 檔），下次從斷點接著抓，不用重來。
 - systemd unit：Linux 開機時負責把服務叫起來、掛掉自動重開的設定檔；放進 /etc 需要 sudo。
@@ -65,7 +65,7 @@ OBSOLETE_ENV_KEYS: dict[str, str] = getattr(config, "DEPRECATED_ENV_KEYS", None)
     "OOB_PYTHON": "OOB 已改 ONNX、與主 venv 共用，此鍵不再使用，可自 deploy/.env 移除",
 }
 
-# data 根底下要建的子目錄：取自 config 常數（相對 DATA_DIR），避免在此重抄一份（R4）
+# data 根底下要建的子目錄：取自 config 常數（相對 DATA_DIR），避免在此重抄一份
 _DATA_DIR_ATTRS = ("INCOMING_DIR", "ARCHIVED_DIR", "WORK_DIR", "VIDEOS_DIR",
                    "FRAMES_DIR", "EXPORTS_DIR")
 
@@ -238,7 +238,7 @@ def _oob_cfg() -> dict:
 
 
 def resolve_oob() -> OobModel:
-    """OOB 模型的實際位置與來源：委派 preprocess.resolve_oob_model（單一實作，R4）。
+    """OOB 模型的實際位置與來源：委派 preprocess.resolve_oob_model（單一實作）。
 
     該函式找不到模型時會 raise（附帶檔缺失，或 onnx_path 指定的自訂模型不存在——不退回附帶）；
     這裡把訊息放進 error，讓 doctor / fetch-models 以 FAIL／結束碼 1 呈現。
@@ -331,7 +331,7 @@ def _chk_ffmpeg() -> list[Check]:
 
 
 def _nvenc_available() -> Optional[bool]:
-    """沿用 preprocess 的 NVENC 偵測（R4）；函式不存在時回 None（無法判定）。"""
+    """沿用 preprocess 的 NVENC 偵測（單一實作）；函式不存在時回 None（無法判定）。"""
     try:
         from . import preprocess as pp
     except Exception:
@@ -419,7 +419,7 @@ def _cuda_live_probe(ort) -> str:
     if dec is None:
         return ""
     try:
-        from .sam_assist.service import _preload_cuda_libs  # 與 SAM 服務同一套預載（R4）
+        from .sam_assist.service import _preload_cuda_libs  # 與 SAM 服務同一套預載（單一實作）
         _preload_cuda_libs()
     except Exception:
         pass
@@ -571,7 +571,7 @@ def _chk_registry() -> list[Check]:
             conn.close()
     except sqlite3.Error as e:
         return [Check("registry", "registry.db", FAIL, f"{db} 無法開啟：{e}",
-                      "確認沒有毀損；必要時從 backups/ 還原（先問人，R9）")]
+                      "確認沒有毀損；必要時從 backups/ 還原（還原會覆蓋現有資料，先問人）")]
     base = f"{db}（{_human(db.stat().st_size)}，{len(tables)} 表，videos={n_videos}）"
     out = [Check("registry", "registry.db", PASS, base)]
     if meta:
@@ -579,7 +579,7 @@ def _chk_registry() -> list[Check]:
                          "schema_meta：" + json.dumps(meta, ensure_ascii=False)))
     else:
         out.append(Check("registry_schema", "registry schema 版本", WARN,
-                         "無 schema_meta 表（v1.3 以前版本只記在註解）",
+                         "無 schema_meta 表（schema v1.3 以前的版本沒有版本紀錄表）",
                          "更新程式後執行 surgann init-db 會補上"))
     return out
 
@@ -939,12 +939,12 @@ def run_setup(*, data_dir: Optional[str], port: Optional[int], annotator: Option
         return 1
     say(f"[2/4] data 根：{dd_eff}（新建子目錄 {created_dirs or '無，皆已存在'}）")
 
-    # 3) registry：已有資料就先備份（R13），再冪等 init-db
+    # 3) registry：已有資料就先備份（registry 是標註唯一來源），再冪等 init-db
     sub_env = {"SURGANN_DATA_DIR": str(dd_eff)}
     if config.REGISTRY_DB.exists() and config.REGISTRY_DB.stat().st_size > 0:
         r = _cli_subprocess(["backup", "--label", "pre-setup"], sub_env)
         if r.returncode != 0:
-            say(f"✗ [3/4] init-db 前備份失敗，停手（R13）：{(r.stdout + r.stderr).strip()[-400:]}")
+            say(f"✗ [3/4] init-db 前備份失敗，停手（動 DB 前必須先備份）：{(r.stdout + r.stderr).strip()[-400:]}")
             return 1
         say("[3/4] 既有 registry 已先備份 → backups/（label=pre-setup）")
     r = _cli_subprocess(["init-db"], sub_env)

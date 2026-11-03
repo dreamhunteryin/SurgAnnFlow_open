@@ -302,6 +302,10 @@
       <li>When done the video is auto-ingested (numbered per series) and added to the selected project; the original folder is moved to
         <code>archived/</code> for safekeeping (not deleted), and the bottom of the page shows the reclaimable space for the administrator's reference.</li>
     </ol>
+    <div class="warn"><b>Before first use: accept the OOB model license.</b> The out-of-body (OOB) detection model used for de-identification ships with the program, but its license is
+      CC BY-NC-SA 4.0 (non-commercial research only) and an administrator must read and accept it first: run
+      <code>surgann fetch-models --only oob</code> in the server terminal, then reload this page. Until it is accepted, a notice banner appears at the top of the page
+      and "queue for processing" is blocked (otherwise the job would fail at the de-identification stage); series management and browser upload are unaffected.</div>
     <p class="dim">The processing queue runs one folder at a time and resumes automatically if the server restarts; a failed job can be "retried" or "deleted" (on delete you may choose to also clear the temporary files).</p>
 
     <div class="warn"><b>Video not showing up in the project?</b> First confirm the video is <strong>ingested</strong>, then use any of the entry points above to add it to this project.

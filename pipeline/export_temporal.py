@@ -1,6 +1,6 @@
-"""temporal 標註匯出（v1.1）：registry annotations → 快照 + 各層 CSV。
+"""temporal 標註匯出：registry annotations → 快照 + 各層 CSV。
 
-欄位定義與一致性檢查共用 export_common（R4）；來源為 registry `annotations` 表
+欄位定義與一致性檢查共用 export_common（單一實作）；來源為 registry `annotations` 表
 （SurgAnn Annotator 直接寫入），不經過任何外部平台格式轉換。
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from . import registry
 from .export_common import (ExportOutcome, TEMPORAL_FIELDS, TRIPLET_FIELDS, LAYERS,
                             TRIPLET_LAYER, check_invariants, exports_dir, next_run_id)
 
-# v1.2 追溯 ID 欄（附加於各層 CSV 尾端；annotator_id 改為 annotators 名冊 id，
+# 追溯 ID 欄（附加於各層 CSV 尾端；annotator_id 改為 annotators 名冊 id，
 # 顯示名另出 annotator_name）
 ID_FIELDS = ["project_id", "annotator_name"]
 
@@ -22,7 +22,7 @@ def rows_from_registry(conn, project_id: str | None = None,
                        ) -> tuple[dict[str, list[dict]], dict[str, float], list[dict]]:
     """annotations 表 → 各層列 + fps 對照 + 原始列（供快照）。
 
-    project_id 給定時以 annotations.project_id 直查（v1.2 標註按專案隔離）；
+    project_id 給定時以 annotations.project_id 直查（標註按專案隔離）；
     影片範圍（fps 對照）走 project_videos 播放清單（registry.list_videos）。
     """
     fps_by_video = {r["video_id"]: float(r["fps"])

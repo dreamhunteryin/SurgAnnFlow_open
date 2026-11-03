@@ -14,7 +14,7 @@
 - **進度**：各 stage 權重（preprocess.yaml jobs.stage_weights）＋ merge / oob /
   cut_encode 三個長時 stage 的 stage 內 progress callback →
   pipeline_jobs.progress（0–100 全程）持續落 DB（節流見 _stage_progress_cb）。
-- **R9**：_incoming 內原始檔全程唯讀；唯一允許的變動是 register 成功後把整個
+- **原始檔唯讀**：_incoming 內原始檔全程唯讀；唯一允許的變動是 register 成功後把整個
   病人資料夾搬到 data/raw_videos/archived/（使用者核定之固定政策，
   不刪除；可清理空間由 reclaimable_space() 回報，實際刪除永遠人工確認）。
 - **PHI 收斂**：videos.source_path 不寫原始路徑；原始檔名/sha256/順序/手術日期
@@ -338,7 +338,7 @@ class Worker:
         jcfg = self.cfg.get("jobs") or {}
         self.poll_interval = (poll_interval if poll_interval is not None
                               else float(jcfg.get("poll_interval_sec", 2)))
-        # stage 內進度落 DB 的節流（preprocess.yaml jobs.*，R5）
+        # stage 內進度落 DB 的節流（preprocess.yaml jobs.*）
         self._throttle_sec = float(jcfg.get("progress_db_min_interval_sec", 1.0))
         self._throttle_pct = float(jcfg.get("progress_db_min_delta_pct", 1.0))
         self._weights = _weights(self.cfg)
@@ -447,7 +447,7 @@ class Worker:
         return cb
 
     def _stage_progress_cb(self, job_id: str, stage: str):
-        """節流 callback 工廠（merge / oob / cut_encode 三 stage 共用，R4）。
+        """節流 callback 工廠（merge / oob / cut_encode 三 stage 共用，單一實作）。
 
         回傳 cb(pct, t=0)：stage 內百分比 0–100 → 全程 progress
         （base + pct/100*weight）落 DB；距上次寫入 ≥_throttle_sec 或
@@ -598,7 +598,7 @@ class Worker:
             art["video_id"] = video_id
             self._save_artifacts(job_id, art)
 
-        # 2) 原始檔清單 sha256（搬 archived 前計算；R9：唯讀）
+        # 2) 原始檔清單 sha256（搬 archived 前計算；原始檔唯讀）
         if "original_files" not in art:
             orig = []
             for f in art["merge_plan"]["files"]:

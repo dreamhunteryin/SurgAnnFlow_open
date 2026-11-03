@@ -10,20 +10,20 @@
                                      → 相對（修復掛載點漂移，如磁碟重新掛載後名稱變成 /media/<user>/Disk1/... 的舊值）
   3. 絕對、在 data 根外             → 原樣保留（data 根外保留絕對路徑）
   4. 相對值：
-     - 庫版本 < 1.4（v1.3 語意＝相對 repo 根，例 `data/exports/...`）→ 以 PROJECT_ROOT 解析後套 1–3；
-       但若「相對 data 根」解讀下檔案已存在，視為已是 v1.4 值、不動
-     - 庫版本 = 1.4 → 已是 v1.4 值，不動
+     - 庫版本 < 1.4（schema v1.3 語意＝相對 repo 根，例 `data/exports/...`）→ 以 PROJECT_ROOT 解析後套 1–3；
+       但若「相對 data 根」解讀下檔案已存在，視為已是 schema v1.4 值、不動
+     - 庫版本 = 1.4 → 已是 schema v1.4 值，不動
 最後 schema_meta.schema_version = '1.4'。
 
 冪等：重跑只會把殘留的絕對路徑（如過渡期舊程式寫入者）再轉一次，已相對者不動。
 單一 transaction；--dry-run 只報告不寫入。遷移前後印各表 COUNT 與「to_abs 後檔案存在」對帳。
 
-執行（先跑 surgann backup，R13）：
+執行（先跑 surgann backup：動 DB 前先備份）：
     python -m pipeline.migrations.m20261102_relative_paths --dry-run
     python -m pipeline.migrations.m20261102_relative_paths [--legacy-data-root /舊/掛載點/data ...]
 
 過渡期退路（非破壞性，可再正向重跑）：`--to-absolute` 把相對值以 to_abs 展回絕對路徑、
-版本記回 1.3——只給「仍在跑 v1.3 舊程式的服務」暫時救急用，消費端都改走 helper 後不應再用。
+版本記回 1.3——只給「仍在跑 schema v1.3 舊程式的服務」暫時救急用，消費端都改走 helper 後不應再用。
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ from .. import config, registry
 
 
 def _legacy_abs(value: str) -> Path:
-    """v1.3 語意解讀：絕對原樣；相對＝相對 repo 根（舊 writer 以 repo 根為 cwd 寫入）。"""
+    """schema v1.3 語意解讀：絕對原樣；相對＝相對 repo 根（舊 writer 以 repo 根為 cwd 寫入）。"""
     p = Path(value)
     return p if p.is_absolute() else config.PROJECT_ROOT / p
 
@@ -54,7 +54,7 @@ def convert_value(value: Optional[str], legacy: bool,
             return value, "rel_kept"
         if (config.DATA_DIR / p).exists():          # 已是相對 data 根（且確實存在）
             return PurePosixPath(*p.parts).as_posix(), "rel_kept"
-        p = config.PROJECT_ROOT / p                 # v1.3：相對 repo 根
+        p = config.PROJECT_ROOT / p                 # schema v1.3：相對 repo 根
     new = config.to_rel(p)
     if not Path(new).is_absolute():
         return new, ("to_rel" if new != value else "rel_kept")
@@ -98,7 +98,7 @@ def migrate(db_path: Optional[Path] = None, dry_run: bool = False,
         log(f"registry：{db}")
         log(f"data 根：{config.DATA_DIR}（來源：{config.DATA_DIR_SOURCE}）")
         log(f"schema 版本（遷移前）：{version_before}"
-            + ("（相對值以 repo 根解讀）" if legacy else "（已是 v1.4，只轉殘留絕對值）"))
+            + ("（相對值以 repo 根解讀）" if legacy else "（已是 schema v1.4，只轉殘留絕對值）"))
         counts_before = _counts(conn)
         exist_before = _exist_report(conn, _legacy_abs if legacy else config.to_abs)
 
@@ -143,7 +143,7 @@ def migrate(db_path: Optional[Path] = None, dry_run: bool = False,
     for t in sorted(set(counts_before) | set(counts_after)):
         b, a = counts_before.get(t), counts_after.get(t)
         log(f"  {t:22s} {b} → {a}" + ("" if b == a else "  ✗ 不一致"))
-    log("\n檔案存在對帳（非空值數 / 存在數；前＝v1.3 解讀，後＝to_abs）：")
+    log("\n檔案存在對帳（非空值數 / 存在數；前＝schema v1.3 解讀，後＝to_abs）：")
     for k in exist_before:
         (nb, eb), (na, ea) = exist_before[k], exist_after[k]
         flag = "" if (nb == na and ea >= eb) else "  ✗ 退化"
@@ -161,7 +161,7 @@ def migrate(db_path: Optional[Path] = None, dry_run: bool = False,
 
 
 def to_absolute(db_path: Optional[Path] = None, dry_run: bool = False, log=print) -> dict:
-    """退路：v1.4 相對值 → 絕對（config.to_abs），schema_version 記回 1.3。冪等、單一 transaction。"""
+    """退路：schema v1.4 相對值 → 絕對（config.to_abs），schema_version 記回 1.3。冪等、單一 transaction。"""
     db = registry.init_db(db_path)
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row

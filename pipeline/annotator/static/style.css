@@ -450,6 +450,10 @@ body.project-page { display: flex; flex-direction: column; overflow: hidden; }
 .ok-mark { color: #4ade80; }
 .err-mark { color: var(--danger); }
 .panel-note { color: var(--dim); font-size: 12px; margin: 8px 0 14px; max-width: 860px; }
+/* 頁面頂部提示橫幅（明顯但不擋操作；例：入庫頁 OOB 授權未同意） */
+.notice-banner { margin: 10px 0 16px; padding: 10px 14px; max-width: 1000px; font-size: 13px; line-height: 1.6;
+  color: var(--fg); background: rgba(255, 140, 0, 0.12); border: 1px solid var(--accent); border-left-width: 4px; border-radius: 6px; }
+.notice-banner code { color: var(--accent); }
 .dl-row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
 .dl-link { color: var(--accent); }
 

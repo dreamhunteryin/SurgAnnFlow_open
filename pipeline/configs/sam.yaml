@@ -1,7 +1,7 @@
 # SAM 輔助標註設定（全後端推論；支援 SAM / SAM2，GPU 或 CPU）
 # 設計：後端以 onnxruntime 跑 SAM/SAM2 ONNX（encoder 每幀一次並快取 embedding，decoder 每次點擊）。
 #
-# 模型來源（現成 ONNX，samexporter 轉檔格式；R8：data/ 不進 git）：
+# 模型來源（現成 ONNX，samexporter 轉檔格式；模型放 data/，不進 git）：
 #   SAM2 兩個 tag 可用 `surgann fetch-models --only sam` 自動下載＋驗 sha256（讀下方 zoo.<tag>.sources）；
 #   mobile_sam 上游只有 zip 包，不支援自動下載，需依下列說明手動解壓到 model.dir。
 #   SAM1: https://huggingface.co/vietanhdev/segment-anything-onnx-models

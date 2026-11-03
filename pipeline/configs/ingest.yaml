@@ -1,8 +1,8 @@
-# 影片標準化 / ingest 參數（R5：參數集中，勿 hard-code）。
+# 影片標準化 / ingest 參數（參數集中於此，勿在程式內 hard-code）。
 
 target:
   height: 720          # 標準化高度；寬度自動保持比例（ffmpeg -2）
-  fps: 25              # 強制固定幀率（CFR）—— LS frame 精度的前提
+  fps: 25              # 強制固定幀率（CFR）—— frame 精度的前提
   crf: 20              # H.264 品質（越小越好，20 視覺近無損）
   preset: medium       # 編碼速度/壓縮比取捨（slow 畫質同但慢~2x；medium 可讓 1hr 影片 <30min 達標）
   pix_fmt: yuv420p     # 最大相容性

@@ -1,10 +1,8 @@
-"""匯出共用基礎設施（R4）：欄位定義、run 目錄/編號、一致性檢查、結果物件。
+"""匯出共用基礎設施（單一實作）：欄位定義、run 目錄/編號、一致性檢查、結果物件。
 
 所有匯出路徑（temporal / spatial / dataset / mosaic）共用本模組，彼此不互相 import。
 
-歷史：這些定義原本住在 `export_ls.py`（Label Studio 是第一個匯出實作，後續匯出
-沿用其骨架）。2026-07-23 移除 LS/CVAT 堆疊時抽出為中性模組——核心匯出不該
-經由某個特定標註平台的檔案載入（R4）。
+本模組與任何特定標註介面無關：核心匯出邏輯集中於此，各匯出路徑共用同一份定義。
 
 不變式：任何輸出列必含 video_id + frame + timestamp，且 timestamp == frame / fps；
 匯出結束跑一致性檢查，不通過即 fail。timestamp 一律由 pipeline 以 frame/fps 計算，
@@ -35,7 +33,7 @@ GLOBAL_EXPORT_SCOPE = "_global"   # 無專案概念的匯出（未帶 -P）
 
 
 def exports_dir(project_id: str | None = None) -> Path:
-    """匯出根目錄（v1.2 按專案分層）：data/exports/{project_id}/。
+    """匯出根目錄（按專案分層）：data/exports/{project_id}/。
 
     無專案概念（project_id=None）統一落 data/exports/_global/。
     播放清單模式上線前的舊 run 已歸檔 data/exports/legacy/（config.LEGACY_EXPORTS_DIR）。
@@ -49,7 +47,7 @@ def next_run_id(project_id: str | None = None,
                 now: datetime | None = None) -> str:
     """run_id = 日期 + 專案 scope + 當日最大序號 + 1，如 2026-07-09_default_run01。
 
-    v1.2：連號在 **該專案子目錄**（exports_dir(project_id)）內掃——各專案
+    連號在 **該專案子目錄**（exports_dir(project_id)）內掃——各專案
     自己 run01 起跳；run_id 內嵌 scope（專案編碼；無專案 = global）確保
     export_runs.run_id（全域 PK）跨專案不撞號，且與 legacy 的
     {date}_runNN 舊格式不衝突。取「既有最大序號 +1」而非「項目數 +1」：

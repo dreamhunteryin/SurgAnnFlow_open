@@ -1,7 +1,7 @@
 """label 格式轉換引擎（Phase B）：registry annotations（單一事實來源）→
 YOLO / frame-label pairs / clip-label pairs。
 
-- 既有 COCO 匯出在 export_spatial，不在此重寫（R4）；
+- 既有 COCO 匯出在 export_spatial，不在此重寫（單一實作）；
   本模組沿用其座標與回溯慣例：影像檔名 {video_id}_f{frame:07d}.jpg、
   sidecar 欄位 video_id/frame_index/time_sec/fps。
 - 只讀 registry，不寫 frames 表 / export_runs（避免與 UI/CLI 寫入路徑衝突）；
@@ -29,7 +29,7 @@ PAIR_FIELDS = ["video_id", "image_path", "frame_index", "time_sec", "fps",
 CLIP_FIELDS = ["video_id", "start_frame", "end_frame", "start_time", "end_time",
                "fps", "layer", "label", "annotator",
                "ann_id", "project_id", "annotator_id", "clip_path"]
-# v1.2：每張圖可能由多筆標註（多專案/多標註者）貢獻 → 多值以 "|" 串接
+# 每張圖可能由多筆標註（多專案/多標註者）貢獻 → 多值以 "|" 串接
 IMAGE_META_FIELDS = ["video_id", "frame_index", "time_sec", "fps", "image",
                      "project_id", "annotator_id", "annotator_name"]
 
@@ -43,7 +43,7 @@ class ConvertError(RuntimeError):
 # ------------------------------------------------------------ 共用工具 -----
 
 def _image_name(video_id: str, frame: int) -> str:
-    """與 export_spatial / sample 的抽幀命名一致（R4）。"""
+    """與 export_spatial / sample 的抽幀命名一致（單一實作）。"""
     return f"{video_id}_f{frame:07d}.jpg"
 
 
@@ -63,7 +63,7 @@ def _load_videos(conn, videos: Optional[Iterable[str]] = None,
 def _ensure_image(video: dict, frame: int, out_path: Path) -> int:
     """確保 out_path 存在：已存在→跳過；FRAMES_DIR 有快取→複製；否則 ffmpeg 抽。
 
-    回傳本次新抽出的張數（0/1）。原始影片唯讀不受影響（R9）。
+    回傳本次新抽出的張數（0/1）。原始影片唯讀不受影響。
     """
     if out_path.exists():
         return 0
@@ -72,7 +72,7 @@ def _ensure_image(video: dict, frame: int, out_path: Path) -> int:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(cached, out_path)
         return 0
-    std_path = config.to_abs(video["std_path"])   # v1.4：registry 存相對 data 根
+    std_path = config.to_abs(video["std_path"])   # schema v1.4：registry 存相對 data 根
     if not std_path or not std_path.exists():
         raise ConvertError(f"標準化影片不存在：{std_path}")
     extract_frame(std_path, float(video["fps"]), frame, out_path)
@@ -165,7 +165,7 @@ def to_yolo(run_dir, videos: Optional[list[str]] = None, db_path=None,
     # 每張唯一 (video, frame) 一張圖；label 行按圖聚合
     det_lines: dict[tuple[str, int], list[str]] = {}
     seg_lines: dict[tuple[str, int], list[str]] = {}
-    # v1.2 sidecar 追溯：每張圖聚合貢獻標註的 project / annotator（多值 "|" 串接）
+    # sidecar 追溯：每張圖聚合貢獻標註的 project / annotator（多值 "|" 串接）
     img_ids: dict[tuple[str, int], dict[str, set]] = {}
     n_det = n_seg = n_points_skipped = 0
     for r in rows:
@@ -234,7 +234,7 @@ def to_yolo(run_dir, videos: Optional[list[str]] = None, db_path=None,
     yaml_path.write_text(yaml.safe_dump({
         "train": "images", "val": "images",
         "names": {i: n for i, n in enumerate(classes)},
-        # v1.2 追溯註記（YOLO txt 本身帶不了 ID → 見 images_meta.csv）
+        # 追溯註記（YOLO txt 本身帶不了 ID → 見 images_meta.csv）
         "project_id": project_id,
     }, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
@@ -278,7 +278,7 @@ def _temporal_intervals_by_layer(conn, project_id: Optional[str] = None,
     sql = "SELECT * FROM annotations WHERE layer != 'spatial'"
     params: tuple = ()
     if project_id is not None:
-        sql += " AND project_id = ?"          # v1.2 annotations.project_id 直查
+        sql += " AND project_id = ?"          # annotations.project_id 直查
         params = (project_id,)
     cur = conn.execute(sql + " ORDER BY video_id, layer, start_frame", params)
     for r in cur:
@@ -403,7 +403,7 @@ def clip_pairs(run_dir, db_path=None, cut: bool = False,
         sql = "SELECT * FROM annotations WHERE layer != 'spatial'"
         params: tuple = ()
         if project_id is not None:
-            sql += " AND project_id = ?"      # v1.2 annotations.project_id 直查
+            sql += " AND project_id = ?"      # annotations.project_id 直查
             params = (project_id,)
         anns = list(conn.execute(
             sql + " ORDER BY video_id, layer, start_frame", params))
@@ -426,7 +426,7 @@ def clip_pairs(run_dir, db_path=None, cut: bool = False,
             clip_name = f"{vid}_f{start:07d}-f{end:07d}.mp4"
             clip_path = clips_dir / clip_name
             if not clip_path.exists():
-                std_path = config.to_abs(v["std_path"])   # v1.4：相對 data 根
+                std_path = config.to_abs(v["std_path"])   # schema v1.4：相對 data 根
                 if not std_path or not std_path.exists():
                     raise ConvertError(f"標準化影片不存在：{std_path}")
                 _cut_clip(std_path, fps, start, end, clip_path)

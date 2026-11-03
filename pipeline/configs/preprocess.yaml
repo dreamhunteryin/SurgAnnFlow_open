@@ -1,4 +1,4 @@
-# 上傳前處理 pipeline 參數（R5：所有閾值集中此處，勿 hard-code）。
+# 上傳前處理 pipeline 參數（所有閾值集中此處，勿在程式內 hard-code）。
 # 流程：合併 → OOB 推論 → 切除+標準化（單一 pass）→ 驗證。
 
 merge:
@@ -65,7 +65,7 @@ encode:                    # 最終標準化編碼（單一 pass：切除 OOB + 
 
 verify:
   duration_tolerance_pct: 0.5   # 輸出 duration vs in-body 段總長 容許誤差（%）
-  # CFR / 解析度 / 幀數檢查重用 ingest.yaml 的 verify 區塊（R4，勿在此複製）
+  # CFR / 解析度 / 幀數檢查重用 ingest.yaml 的 verify 區塊（單一實作，勿在此複製）
 
 jobs:                      # pipeline_jobs 單 worker 佇列（pipeline/jobs.py）
   poll_interval_sec: 2     # worker 掃佇列的輪詢間隔（秒）
