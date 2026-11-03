@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SurgAnnFlow Annotator User Manual</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* 自包含樣式（與平台一致的深色系；本頁可獨立另開，不外連 style.css）*/
+  :root{
+    --bg:#1e2227; --bg2:#262b31; --bg3:#2e343b;
+    --fg:#dde3e9; --dim:#8a949e; --line:#3a424b;
+    --accent:#ff8c00; --sel:#4da3ff; --rec:#ff5252; --danger:#e05555;
+    --ok:#4ade80;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:15px/1.7 system-ui,"Noto Sans TC",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--sel); text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  code{background:var(--bg3); color:#ffd9a0; padding:1px 6px; border-radius:4px; font-size:.9em}
+  kbd{
+    display:inline-block; background:var(--bg3); border:1px solid var(--line);
+    border-bottom-width:2px; border-radius:5px; padding:1px 7px; font-size:.85em;
+    color:#fff; white-space:nowrap;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+  /* 頂欄 */
+  header{
+    position:sticky; top:0; z-index:5; background:#181c20ee; backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  header .wrap{display:flex; align-items:center; gap:14px; height:56px}
+  .brand{font-weight:700; letter-spacing:.5px; color:var(--accent); font-size:18px}
+  .brand span{color:var(--fg); font-weight:400; font-size:14px}
+  header .spacer{flex:1}
+  header a.back{
+    background:var(--bg3); border:1px solid var(--line); color:var(--fg);
+    padding:5px 12px; border-radius:6px; font-size:13px;
+  }
+  header a.back:hover{background:var(--accent); color:#10131a; text-decoration:none}
+
+  /* Hero */
+  .hero{padding:36px 0 8px}
+  .hero h1{margin:0 0 8px; font-size:28px}
+  .hero p{margin:0; color:var(--dim); max-width:760px}
+
+  /* 目錄 */
+  nav.toc{
+    background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:18px 22px; margin:26px 0 10px;
+  }
+  nav.toc h2{margin:0 0 12px; font-size:14px; color:var(--dim); text-transform:uppercase; letter-spacing:1px}
+  nav.toc ol{margin:0; padding:0; list-style:none; columns:2; column-gap:32px}
+  nav.toc li{margin:0 0 7px; break-inside:avoid}
+  nav.toc a{display:inline-block}
+  nav.toc .num{
+    display:inline-block; width:22px; height:22px; line-height:22px; text-align:center;
+    background:var(--bg3); border-radius:6px; color:var(--accent); font-size:12px;
+    margin-right:8px; font-weight:600;
+  }
+
+  /* 章節 */
+  section{padding:30px 0; border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+  h2.sec{font-size:22px; margin:0 0 6px; scroll-margin-top:70px}
+  h2.sec .num{
+    display:inline-block; min-width:30px; height:30px; line-height:30px; text-align:center;
+    background:var(--accent); color:#10131a; border-radius:8px; font-size:15px;
+    margin-right:12px; font-weight:700; vertical-align:2px;
+  }
+  h3{font-size:16px; margin:22px 0 6px; color:#fff}
+  p{margin:8px 0}
+  ul,ol.steps{margin:8px 0; padding-left:22px}
+  li{margin:5px 0}
+
+  /* 白話小盒 */
+  .note{
+    background:#20303a; border-left:4px solid var(--sel); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#cfe6f5;
+  }
+  .note b{color:#fff}
+  .warn{
+    background:#3a2a20; border-left:4px solid var(--accent); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#f5e2cf;
+  }
+  .tip{
+    background:#213026; border-left:4px solid var(--ok); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#d3f0dd;
+  }
+
+  /* pre / 指令 */
+  pre{
+    background:#14171b; border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; overflow-x:auto; margin:12px 0;
+  }
+  pre code{background:none; color:#c7f0d8; padding:0; font-size:13px}
+
+  /* 表格 */
+  .tbl-wrap{overflow-x:auto; margin:14px 0}
+  table{border-collapse:collapse; width:100%; font-size:14px}
+  th,td{border:1px solid var(--line); padding:7px 12px; text-align:left; vertical-align:top}
+  th{background:var(--bg3); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:var(--bg2)}
+  td kbd{font-size:.82em}
+
+  /* icon 說明格 */
+  .icon-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin:14px 0}
+  .icon-cell{background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:10px 12px}
+  .icon-cell .glyph{font-size:20px; color:var(--accent)}
+  .icon-cell .cap{font-size:13px; color:var(--dim); margin-top:2px}
+
+  /* UI 分區示意（三欄：中間影片 / 工具列 / layers+詳情） */
+  .layout-map{
+    display:grid; grid-template-columns:1fr 72px 220px; grid-template-rows:auto 1fr auto;
+    gap:6px; margin:16px 0; min-height:230px; font-size:12px;
+  }
+  .lm{background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:8px; color:var(--dim)}
+  .lm b{color:var(--fg); font-size:13px}
+  .lm.top{grid-column:1/4; text-align:center; background:#181c20}
+  .lm.bottom{grid-column:1/2; background:#181c20}
+  .lm.center{color:#fff; display:flex; align-items:center; justify-content:center; background:#000}
+  .lm.tall{grid-row:2/4}
+
+  footer{padding:40px 0 60px; color:var(--dim); font-size:13px; text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="brand">SurgAnnFlow <span>User Manual</span></span>
+    <span class="spacer"></span>
+    <a class="back" href="index.html">← Projects</a>
+    <a class="back" href="app.html">Annotator</a>
+    <a class="back" href="guide.html" id="langToggle" title="切換為繁體中文">中文</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>SurgAnnFlow Annotator User Manual</h1>
+    <p>This is the operating guide for the surgical-video annotation platform. You need no front-end or server background&mdash;just follow each section step by step.
+       The interface follows a <strong>Roboflow-style</strong> design: <strong>pick a tool first, draw the shape first, then choose the class afterward</strong>.
+       Temporal segment annotations (on the timeline) and spatial region annotations (on the frame) are both done in the <strong>same web page</strong>.
+       Videos are organized into libraries by <strong>project</strong>, and once annotated you can export a dataset directly from the web page.</p>
+  </div>
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#s1"><span class="num">1</span>Platform overview (project → video → annotation → export)</a></li>
+      <li><a href="#s2"><span class="num">2</span>Video library and projects</a></li>
+      <li><a href="#s3"><span class="num">3</span>Entering the annotation page</a></li>
+      <li><a href="#s4"><span class="num">4</span>Interface tour</a></li>
+      <li><a href="#s5"><span class="num">5</span>Core workflow: draw first, choose class after</a></li>
+      <li><a href="#s6"><span class="num">6</span>Temporal annotation (time segments)</a></li>
+      <li><a href="#s7"><span class="num">7</span>Spatial annotation (on-frame regions)</a></li>
+      <li><a href="#s8"><span class="num">8</span>Timeline and layers panel</a></li>
+      <li><a href="#s9"><span class="num">9</span>Sampling to generate events</a></li>
+      <li><a href="#s10"><span class="num">10</span>Label management</a></li>
+      <li><a href="#s11"><span class="num">11</span>Complete keyboard shortcut table</a></li>
+      <li><a href="#s12"><span class="num">12</span>Exporting datasets</a></li>
+      <li><a href="#s13"><span class="num">13</span>Frequently asked questions</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 ============================================================= -->
+  <section id="s1">
+    <h2 class="sec"><span class="num">1</span>Platform overview (project → video → annotation → export)</h2>
+    <p>The whole platform workflow is just four steps:</p>
+    <ol class="steps">
+      <li><b>Project</b>: first create or select a project. Each project has its own <strong>class list (taxonomy)</strong> and its own videos.</li>
+      <li><b>Video</b>: "ingest" a source video into the project&mdash;the system standardizes it to 25fps and registers it.</li>
+      <li><b>Annotation</b>: click a video card to enter the annotation page, then use the tools to draw temporal segments and spatial shapes.</li>
+      <li><b>Export</b>: click "Download dataset" on the project page for one-click export, or have an administrator convert it into a training format with the <code>surgann</code> command.</li>
+    </ol>
+
+    <p>Annotation itself comes in two kinds, both done in the same interface:</p>
+    <ul>
+      <li><b>Temporal annotation</b>: draw "a span of time" on the <strong>timeline</strong>.
+        For example, "from 3:20 to 5:00 is the <code>Calot_triangle_dissection</code> phase."</li>
+      <li><b>Spatial annotation</b>: outline an object on the <strong>video frame</strong>.
+        For example, "in this frame, this box is <code>gallbladder</code>."</li>
+    </ul>
+
+    <div class="note">
+      <b>A few terms explained</b><br>
+      • <b>Project</b>: as in Roboflow, one project = one annotation task (e.g. "cholecystectomy phase annotation"), with its own videos and class list.<br>
+      • <b>Frame</b>: a single picture of the video. This platform always standardizes video to a fixed 25 frames per second, so "which frame" maps to "which second" rigidly one-to-one (<code>seconds = frame ÷ 25</code>), which keeps annotation positions precise.<br>
+      • <b>Registry</b>: a database file (<code>registry/registry.db</code>), the platform's <strong>single source of truth</strong>. Projects, videos, classes, and annotations are all stored in it; every action you take in the web page is written to it immediately&mdash;the web page is only a "workbench," while the real data asset lives in the registry.
+    </div>
+
+    <h3>Two components</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Component</th><th>Responsibility</th><th>When to use</th></tr>
+      <tr><td><b>SurgAnnFlow Annotator</b></td><td>Project/video management + temporal + spatial annotation (incl. ✨ SAM smart assist) + export download (all in the same web page)</td><td>All day-to-day annotation happens here</td></tr>
+      <tr><td><b>pipeline (<code>surgann</code> command)</b></td><td>Ingest, frame extraction, dataset conversion, backup</td><td>Run by an administrator in the terminal (see Section 12)</td></tr>
+    </table></div>
+  </section>
+
+  <!-- 2 ============================================================= -->
+  <section id="s2">
+    <h2 class="sec"><span class="num">2</span>Video library and projects</h2>
+    <p>An administrator first starts the service in the terminal (<code>surgann annotate</code>), then you open the URL in a browser (default):</p>
+    <pre><code>http://127.0.0.1:8090</code></pre>
+
+    <h3>Landing page: project cards</h3>
+    <p>What you see after opening the URL is the <strong>project list</strong>. Each project is a card showing: the project name, a type badge
+      (<code>temporal</code> / <code>spatial</code> / <code>mixed</code>), the annotation group (what this project is annotating), and the video count.</p>
+    <ul>
+      <li><strong>Click a project card</strong> → enter that project's page.</li>
+      <li><strong>Click "＋ Create project"</strong> → a dialog pops up; fill in three fields:
+        <b>project name</b> (e.g. Cholecystectomy Phases),
+        <b>type</b> (temporal = timeline only / spatial = frame only / mixed = both, default mixed), and
+        <b>Annotation group</b> (a one-line description of what is being annotated, e.g. surgical phases).
+        You can also optionally "<b>copy classes from an existing project</b>"&mdash;this brings all of the source project's classes (including the triplet three dropdowns) into the new project,
+        <strong>copying only the classes, never the annotations</strong> (off by default). Click "Create" to finish.</li>
+    </ul>
+
+    <h3>Project page: four tabs</h3>
+    <p>The project page has four tabs on the left (the title bar also shows the <strong>project code</strong>&mdash;a fixed identifier that export and the CLI use to specify the project):</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Tab</th><th>Contents</th></tr>
+      <tr><td><b>🎬 Videos</b></td>
+        <td>The video list for this project. Each card: thumbnail, video number, series badge, status badge, length / resolution / fps, and
+            the annotation count <strong>within this project</strong>. <strong>Click a card to enter the annotation page</strong>;
+            the top-right also has "<b>＋ Add video</b>" and each card has "<b>Remove from project</b>" (explained below).</td></tr>
+      <tr><td><b>📥 Upload data</b></td>
+        <td>Fast ingest of a <strong>single video file</strong>: a results table from scanning the server disk <code>data/raw_videos/</code> (filename / size / video_id / status).
+            Place the file into that directory first (the source file is <strong>read-only</strong> and is never modified), choose "ingest into series," then click "<b>Ingest</b>"
+            to standardize it into a 25fps video and add it to this project. <strong>The video_id is auto-assigned by the system per series</strong>
+            (<code>{series ID}_{four digits}</code>, e.g. <code>ABCD_0004</code>); no manual naming is needed.
+            Transcoding large files takes a few minutes; the status shows "⏳ Ingesting…," and when done a new card automatically appears in the Videos tab.
+            If a file is <strong>already ingested but not yet in this project</strong>, an "<b>＋ Add to this project</b>" button appears&mdash;one click, no re-transcoding needed.
+            For a <strong>patient folder</strong> (multiple recording segments that need to be merged and de-identified), use the "📥 Video ingest" page instead (see below).</td></tr>
+      <tr><td><b>🏷 Classes</b></td>
+        <td>The <strong>taxonomy management</strong> for this project: the class lists for each layer&mdash;phase / action / event / spatial&mdash;which can be
+            <strong>added, renamed, recolored, or deleted</strong> at any time. Renaming updates existing annotations in sync;
+            deleting a class that is already in use prompts for confirmation first (its annotations are deleted along with it).
+            Above there is also "<b>Import classes from another project</b>": merges the source project's classes into this project
+            (same-layer, same-name entries are skipped automatically; <strong>annotations are not copied</strong>).</td></tr>
+      <tr><td><b>📦 Download dataset</b></td>
+        <td>Choose the export format (MOSaiC / COCO / YOLO / temporal / spatial) → click "Export" → when done an <b>⬇ Download zip</b> link appears.
+            The export scope = <strong>this project</strong>. See Section 12 for details.</td></tr>
+    </table></div>
+
+    <h3>Add a video to a project (does not copy the video)</h3>
+    <p>A video only needs to be <strong>ingested once</strong>; after that any project can "reference" it&mdash;the same video can belong to multiple projects simultaneously,
+       and <strong>each project's annotations are independent</strong> (what you annotate in project A is not visible in and not affected by project B).
+       There are three entry points for adding a video to a project:</p>
+    <ul>
+      <li><b>＋ Add video</b> (top-right of the 🎬 Videos tab): pops up the video library list, showing ingested videos not yet in this project
+          (with series and duration); click "Add" on each one.</li>
+      <li><b>📚 Import entire series</b> (at the top of the same dialog): choose a series (e.g. ABCD) → click the button → all videos in that series are added at once
+          (those already in the project are skipped automatically).</li>
+      <li><b>📥 Upload data</b>: for a not-yet-ingested file click "Ingest" (after transcoding it is added to this project automatically);
+          for an already-ingested one click "＋ Add to this project."</li>
+    </ul>
+
+    <h3>Remove a video from a project</h3>
+    <p>The "<b>Remove from project</b>" control at the top-right of a video card (appears on mouse-over) removes the video from <strong>this project's list</strong>;
+       the video itself stays in the video library, and other projects are entirely unaffected. If this project already has annotations on this video, a warning appears first
+       ("This project has N annotations on this video; removing will delete them too")&mdash;<strong>after you confirm, these annotations are deleted</strong> (other projects' annotations are untouched),
+       so be sure to read the count carefully before confirming.</p>
+
+    <h3>Video library and series (lower half of the Landing page)</h3>
+    <p>Below the project cards on the Landing page is the <strong>video library</strong>: all ingested videos are shown in two levels by <strong>series folder</strong>&mdash;
+       the first level lists series cards (name, series ID, video count, institution / procedure); clicking in lists that series' video cards
+       (videos with no series go into an "Unclassified" folder; "← Back to series list" returns to the upper level).
+       Opening a video from the video library is <strong>pure browse mode</strong>: only the player and video info, <strong>with no annotations or annotation tools shown</strong>;
+       the right side of the page lists the "owning projects," and only by clicking "✏ Open annotation in this project" do you enter full annotation mode&mdash;annotation is always accessed through a project
+       (the same video's annotations in different projects are independent of one another).
+       A <b>series</b> is the grouping unit at video-ingest time (the asset layer, e.g. one batch of sources or one type of procedure),
+       and is independent of annotation projects: a series manages video assets, a project manages annotation work.
+       Series are created and managed on the "<b>📥 Video ingest</b>" page (name / institution / surgery category can be changed at any time; the four-character series ID is system-generated and cannot be changed),
+       and video numbers are auto-assigned per series (e.g. <code>ABCD_0001</code>).
+       Videos in the same series can all be added at once from the project page via "Import entire series."</p>
+
+    <h3>Video ingest page (batch ingest of patient folders + de-identification)</h3>
+    <p>Enter it via "<b>📥 Video ingest</b>" at the top-right of the Landing page. A full surgery is often split by the recorder into multiple files placed in one
+       <strong>patient folder</strong>; this page processes the entire folder into <strong>one</strong> de-identified standardized video, in five steps:</p>
+    <ol class="steps">
+      <li><b>Choose a series</b> (or create a new series at the top of the page first); you may also select "add to an annotation project when done."</li>
+      <li><b>Provide the patient folder</b>, via one of two entry points:
+        <b>select from server disk</b> (an administrator places the folder into <code>data/raw_videos/_incoming/</code>, then click Rescan)
+        or <b>upload from browser</b> (select the local folder directly, uploaded in 50MB chunks, resumable after a disconnect).</li>
+      <li><b>Confirm the merge order</b>: the system lists all files sorted by filename; <strong>you can drag to reorder</strong> before queuing them for processing
+        (a wrong order makes the merge result unrecoverable, so compare the sequence of recorded segments; if a "⚠ mtime inconsistent" warning appears, check especially carefully).</li>
+      <li>The system automatically: merges → detects <strong>out-of-body frames</strong> → stops at
+        "<b>Awaiting QC approval</b>"&mdash;click "🔍 QC approval" to review the thumbnails of the suggested segments to cut out,
+        where you can fine-tune the start/end seconds, delete false positives, or add missed segments; only <strong>after approval</strong> are they cut and transcoded.
+        The confidence badge next to each segment: <b>● High confidence</b> (green, median out-of-body probability ≥ 0.9) is mostly reliable;
+        <b>▲ Uncertain</b> (yellow, &lt; 0.9) = the model is not very sure, so check these segments' thumbnails first for false positives.
+        Leaving out-of-body frames in = a privacy incident, so err toward cutting more.</li>
+      <li>When done the video is auto-ingested (numbered per series) and added to the selected project; the original folder is moved to
+        <code>archived/</code> for safekeeping (not deleted), and the bottom of the page shows the reclaimable space for the administrator's reference.</li>
+    </ol>
+    <p class="dim">The processing queue runs one folder at a time and resumes automatically if the server restarts; a failed job can be "retried" or "deleted" (on delete you may choose to also clear the temporary files).</p>
+
+    <div class="warn"><b>Video not showing up in the project?</b> First confirm the video is <strong>ingested</strong>, then use any of the entry points above to add it to this project.
+      If the file is not in the scan table under "📥 Upload data," ask the administrator to place the video into the server's
+      <code>data/raw_videos/</code> (see Section 13).</div>
+    <div class="tip">We recommend <strong>watching the video from start to finish once</strong> before you begin annotating; having a sense of the overall flow makes you more efficient.</div>
+  </section>
+
+  <!-- 3 ============================================================= -->
+  <section id="s3">
+    <h2 class="sec"><span class="num">3</span>Entering the annotation page</h2>
+    <ol class="steps">
+      <li>Landing page → click a <strong>project card</strong>.</li>
+      <li>Project page "🎬 Videos" → click a <strong>video card</strong> (equivalent to opening <code>app.html?v=ABCD_0001</code>).</li>
+      <li>After the annotation page loads, the <strong>available class list is this project's taxonomy</strong> (each project is independent).</li>
+    </ol>
+    <p>In the annotation page's top bar:</p>
+    <ul>
+      <li><b>📁 Video library</b>: return to the project page to switch videos / switch projects.</li>
+      <li><b>☰ Menu</b>: contains "📖 User Manual (new tab, this very page)" and "⌨ Shortcut list."</li>
+      <li>The middle shows the <strong>current video number</strong> and the <strong>project badge</strong> (annotations are recorded under this project).</li>
+      <li>The right side is the <strong>annotator selector</strong> (see below).</li>
+    </ul>
+
+    <h3>Choose the annotator (confirm before you start!)</h3>
+    <p>The "Annotator" dropdown at the top-right determines <strong>who each subsequent annotation is credited to</strong>.
+       Confirm it is set to you before you start annotating:</p>
+    <ol class="steps">
+      <li>Open the dropdown and select your name.</li>
+      <li>Not in the list? Select "<b>＋ Add annotator…</b>" → enter a name (e.g. Dr. Wang) → confirm, and the system adds you to the roster and selects you automatically.</li>
+      <li>Once selected, the browser remembers it and fills it in automatically next time; if someone else takes over mid-way, remember to change this first.</li>
+    </ol>
+    <div class="tip">The same video in the same project can hold annotations from multiple annotators at once; on export, each annotation carries its annotator info, so you can later break down or compare them separately.</div>
+  </section>
+
+  <!-- 4 ============================================================= -->
+  <section id="s4">
+    <h2 class="sec"><span class="num">4</span>Interface tour</h2>
+    <p>The annotation page is a clean three-column layout:</p>
+
+    <div class="layout-map">
+      <div class="lm top"><b>Top bar</b>: SurgAnnFlow ・ 📁 Video library ・ ☰ Menu ・ current video ・ annotator</div>
+      <div class="lm center">Center: video frame<br>(spatial is drawn directly on this)</div>
+      <div class="lm"><b>Toolbar</b><br>⬚ Select<br>⏱ Segment<br>──<br>▭ Box<br>⬠ Polygon<br>• Point<br>⬭ Ellipse<br>〰 Polyline<br>──<br>✨ Smart</div>
+      <div class="lm tall"><b>Far-right panel</b><br><br><b>Annotations (layers)</b><br>Annotations on the current frame<br>layer → class grouping<br>👁 Layered hide ・ 🗑 Delete<br><br><b>Selection details</b><br>Start/End・interpolation<br>keypoints・triplet<br>sampling・delete</div>
+      <div class="lm bottom"><b>Bottom (below the center column)</b>: transport controls + timeline</div>
+    </div>
+
+    <h3>Center: video + overlay</h3>
+    <p>The playback area. Spatial shapes are drawn directly on the video (overlay). You can use <kbd>Ctrl</kbd>+scroll to zoom the video, and double-click to reset (see Section 7).</p>
+
+    <h3>Right: toolbar (Roboflow-style, tool-first)</h3>
+    <p>A vertical row of icons; <strong>pick a tool before you act</strong>. From top to bottom:</p>
+    <div class="icon-grid">
+      <div class="icon-cell"><span class="glyph">⬚</span><div>Select</div><div class="cap">Select an annotation (<kbd>V</kbd>); after selecting, press <kbd>E</kbd> to edit</div></div>
+      <div class="icon-cell"><span class="glyph">⏱</span><div>Segment</div><div class="cap">Start a time-segment annotation (<kbd>T</kbd>, one-shot)</div></div>
+      <div class="icon-cell"><span class="glyph">▭</span><div>Box</div><div class="cap">bbox (<kbd>B</kbd>)</div></div>
+      <div class="icon-cell"><span class="glyph">⬠</span><div>Polygon</div><div class="cap">polygon (<kbd>P</kbd>)</div></div>
+      <div class="icon-cell"><span class="glyph">•</span><div>Point</div><div class="cap">point (<kbd>O</kbd>)</div></div>
+      <div class="icon-cell"><span class="glyph">⬭</span><div>Ellipse</div><div class="cap">ellipse (<kbd>E</kbd>)</div></div>
+      <div class="icon-cell"><span class="glyph">〰</span><div>Polyline</div><div class="cap">polyline (<kbd>L</kbd>)</div></div>
+      <div class="icon-cell"><span class="glyph">✨</span><div>Smart</div><div class="cap">SAM assist (<kbd>S</kbd>): one click auto-generates a polygon</div></div>
+    </div>
+
+    <h3>Far right: layers panel + selection details</h3>
+    <ul>
+      <li><b>Annotations (layers)</b>: lists only the annotations <strong>under the current playhead frame</strong>, grouped by layer (phase / action / event / triplet / spatial)
+        → class; the <strong>number in parentheses after a class name = that class's total annotation count across the whole video</strong> (e.g. <code>preparation (3)</code>).
+        Layer / shape / class headers and each entry have a <b>👁</b> (layered hide, see Section 8), and each entry also has a <b>🗑</b> (delete).
+        <strong>Clicking an entry</strong> selects it and jumps to its start; <kbd>Shift</kbd>+click = add to multi-selection.</li>
+      <li><b>Selection details</b>: appears after you select an annotation. You can change Start / End (the adjacent <b>⌖</b> = set to the current frame),
+        the triplet three dropdowns, spatial interpolation toggle and keypoint list, sampling to generate events, and jump-to-start / hide / delete. See Section 8 for details.</li>
+    </ul>
+
+    <h3>Bottom: transport controls</h3>
+    <ul>
+      <li><b>⏮ ▶ ⏭</b>: to start / play-pause / to end; <b>speed</b> 0.2x–5x.</li>
+      <li><b>‹ ›</b>: ±1 frame (<kbd>Ctrl+←</kbd>/<kbd>Ctrl+→</kbd>); the <b>frame…</b> input box: jump directly to a given frame.</li>
+      <li><b>|◀ ▶|</b>: jump to the start of the previous / next annotation (<kbd>←</kbd>/<kbd>→</kbd>)&mdash;only between <strong>visible</strong> annotations,
+        skipping those hidden by 👁 (collapsing a track does not count as hiding); <b>◆◀ ▶◆</b>: jump to the previous / next keypoint (appears only when a spatial annotation is selected).</li>
+      <li><b>Time display</b>: click it to toggle between "time ↔ frame" display.</li>
+      <li><b>Zoom button (bottom-right, shows the current level)</b>: each click advances one level, cycling
+          <b>100% → 200% → 400% → 800% → frame level → back to 100%</b>; <kbd>Ctrl</kbd>+scroll zooms freely.</li>
+    </ul>
+  </section>
+
+  <!-- 5 ============================================================= -->
+  <section id="s5">
+    <h2 class="sec"><span class="num">5</span>Core workflow: draw first, choose class after</h2>
+    <p>SurgAnnFlow uses a Roboflow-style flow&mdash;<strong>you don't have to decide the class first</strong>; draw the thing first, and only after you finish does the system ask "what is this":</p>
+    <ol class="steps">
+      <li><b>Pick a tool</b>: click it in the right toolbar, or press its shortcut (<kbd>B</kbd> box, <kbd>T</kbd> segment…).</li>
+      <li><b>Draw</b>: draw a shape on the video (spatial); for temporal, press <kbd>T</kbd> to record the start, play/click the timeline to extend, and <kbd>Enter</kbd> to set the end (Section 6).</li>
+      <li><b>Choose a class</b>: once you finish, a <strong>floating class menu</strong> (class popup) pops up automatically,
+        listing this project's classes (e.g. <code>gallbladder</code>, <code>hook</code>…). Click one, or type to search then press <kbd>Enter</kbd>.</li>
+      <li><b>Done</b>: the annotation is saved to the registry immediately (an "Annotated ×××" toast appears at the bottom-right), and this annotation is auto-selected.</li>
+    </ol>
+
+    <h3>Using the floating class menu</h3>
+    <ul>
+      <li><b>Search box</b>: type to filter; <kbd>↑</kbd>/<kbd>↓</kbd> to move, <kbd>Enter</kbd> to select.</li>
+      <li><b>Add a class</b>: type a name that doesn't exist, and "＋ Add '×××'" appears at the bottom of the list; click it (or press <kbd>Enter</kbd>)
+        to add the new class to <strong>this project's taxonomy</strong> and apply it right away (see Section 10).</li>
+      <li><b>The last-used class</b> is marked with <b>↩</b> and is <strong>highlighted by default</strong>&mdash;just press <kbd>Enter</kbd> to apply it, handy for annotating the same thing repeatedly.</li>
+      <li><b>The temporal menu has tabs</b>: four tabs&mdash;phase / action / event / triplet&mdash;switch the layer first, then choose the class (see Section 6).</li>
+      <li><kbd>Esc</kbd>: discard this drawing (the shape is not saved).</li>
+    </ul>
+
+    <h3><kbd>N</kbd>: auto-apply the last class (accelerator for annotating the same object repeatedly)</h3>
+    <p>Once turned on with <kbd>N</kbd>, <strong>every finished shape immediately gets the last spatial class applied</strong>, without popping up the class menu&mdash;
+       ideal for annotating dozens of the same object type in one go. Press <kbd>N</kbd> again to turn it off.</p>
+    <ul>
+      <li>You must have manually annotated one spatial first (so there is a "last class" to apply).</li>
+      <li>If the current tool is not a drawing tool when you turn it on, it auto-switches to <b>▭ Box</b>.</li>
+    </ul>
+    <div class="tip">Typical rhythm: <kbd>B</kbd> to pick the box tool → draw the first one → choose <code>hook</code> → press <kbd>N</kbd> →
+      from then on every box you draw is automatically <code>hook</code> → press <kbd>N</kbd> when done to turn it off.</div>
+  </section>
+
+  <!-- 6 ============================================================= -->
+  <section id="s6">
+    <h2 class="sec"><span class="num">6</span>Temporal annotation (time segments)</h2>
+    <p>Temporal annotation draws "a span" on the timeline. There are four layers, <strong>fully independent of one another and freely overlapping</strong>:</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Layer</th><th>Meaning</th><th>Example</th></tr>
+      <tr><td><code>phase</code></td><td>Surgical phase</td><td>Preparation, Calot_triangle_dissection…</td></tr>
+      <tr><td><code>action</code></td><td>Action / verb</td><td>grasp, dissect, clip…</td></tr>
+      <tr><td><code>event</code></td><td>Point or short-segment event</td><td>bleeding, CVS_achieved…</td></tr>
+      <tr><td><code>triplet</code></td><td>An (instrument, verb, target) triplet attached to an interval</td><td>grasper + dissect + cystic_duct</td></tr>
+    </table></div>
+
+    <h3>Annotate a temporal span (annotate as you watch)</h3>
+    <ol class="steps">
+      <li><b>Line up the start first</b>: pause the video, or click the timeline to jump to the target frame.</li>
+      <li>Press <kbd>T</kbd> or click the <b>⏱ Segment</b> tool = <strong>start annotating</strong>; the start is the current frame.
+          An orange "⏺ Segment annotation in progress" bar appears above the timeline, showing the current start/end and length.</li>
+      <li>Extend this span's length, in either of two ways which may be mixed:
+        <ul>
+          <li><b>Play the video</b> (<kbd>Space</kbd>)&mdash;the span follows wherever the playhead goes;</li>
+          <li><b>Click a spot on the timeline</b>&mdash;the span scales to that time point automatically (clicking before the start pulls the start earlier).</li>
+        </ul></li>
+      <li>Press <kbd>Enter</kbd> or "✓ Confirm" on the orange bar = <strong>set the end</strong>, which pops up the <strong>class menu</strong>
+          (the four tabs <b>phase / action / event / triplet</b>), with the <strong>last-used class highlighted by default</strong>.</li>
+      <li><strong>Press <kbd>Enter</kbd> again</strong> = finish with the default class directly;
+          to change the class, click the list (or type to search + <kbd>Enter</kbd>).</li>
+    </ol>
+    <ul>
+      <li><b>"Segment" is one-shot</b>: after each finished annotation the ⏱ button automatically returns to the inactive state;
+          clicking the timeline when not annotating <strong>just seeks</strong> and never creates an annotation.</li>
+      <li>While annotating, pressing <kbd>T</kbd> again (or the ⏱ button) = cancel this span; <kbd>Esc</kbd> works too (any time before confirming).</li>
+      <li>The tabs remember the <strong>last layer you used</strong>, so annotating the same layer in a row needs no re-switching.</li>
+    </ul>
+    <div class="tip">Rhythm for annotating the same class repeatedly: line up the start → <kbd>T</kbd> → play to the end → <kbd>Enter</kbd> →
+      <kbd>Enter</kbd>&mdash;two presses of Enter is one annotation.</div>
+
+    <h3>The triplet three dropdowns</h3>
+    <p>After choosing a class in the <b>triplet</b> tab of the class menu, the selection details panel shows three dropdowns&mdash;<b>instrument / verb / target</b>;
+       once all three are chosen, a surgical-action triplet is complete.</p>
+
+    <h3>Fine-tuning and deleting</h3>
+    <ul>
+      <li><b>Double-click a segment</b> = open the <strong>edit dialog</strong>: you can directly change the <strong>class</strong> and the <strong>start/end frame</strong>,
+          and changing start/end makes the video jump to that frame in sync.</li>
+      <li><b>Drag an edge (must enter edit mode first)</b>: after selecting a segment, press <kbd>E</kbd> to enter <strong>edit mode</strong>
+          before you can drag the segment's left/right edges&mdash;without edit mode it is pure browsing and there is no accidental drag. As you drag, <strong>the video frame follows along</strong>,
+          so the frame tells you exactly which second / frame you've dragged to. Press <kbd>E</kbd> again or select another annotation to leave edit mode.</li>
+      <li>Very short segments (e.g. 1 frame) are draggable too: in edit mode, click its <strong>left half to drag the start, right half to drag the end</strong>.</li>
+      <li><b>Clicking any annotation</b> on the timeline makes the video jump to that annotation's start in sync.</li>
+      <li>The Start / End fields in the details panel accept a frame directly; the adjacent <b>⌖</b> = set to the current frame.</li>
+      <li><b>Delete</b>: after selecting, press <kbd>Del</kbd>, use "Delete" in the edit dialog, or the <b>🗑</b> in the layers panel.</li>
+    </ul>
+    <div class="tip">"The event is only an instant" is fine too&mdash;stop on that frame, press <kbd>T</kbd> then <kbd>Enter</kbd> directly for a 1-frame annotation;
+      for regularly spaced point events, use "sampling to generate events" (Section 9).</div>
+  </section>
+
+  <!-- 7 ============================================================= -->
+  <section id="s7">
+    <h2 class="sec"><span class="num">7</span>Spatial annotation (on-frame regions)</h2>
+    <p>Spatial annotation draws shapes <strong>on the video frame</strong> to enclose objects. Five hand-drawing tools plus one AI-assist tool:</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Tool</th><th>Key</th><th>How to draw</th></tr>
+      <tr><td><b>▭ Box (bbox)</b></td><td><kbd>B</kbd></td><td>Hold and drag out the diagonal.</td></tr>
+      <tr><td><b>⬠ Polygon</b></td><td><kbd>P</kbd></td><td>Click point by point; finish with <kbd>Enter</kbd> or a <strong>double-click</strong> (at least 3 points).</td></tr>
+      <tr><td><b>• Point</b></td><td><kbd>O</kbd></td><td>One click completes it.</td></tr>
+      <tr><td><b>⬭ Ellipse</b></td><td><kbd>E</kbd></td><td>Hold and drag out the bounding box.</td></tr>
+      <tr><td><b>〰 Polyline</b></td><td><kbd>L</kbd></td><td>Click point by point; finish with <kbd>Enter</kbd> or a double-click (at least 2 points).</td></tr>
+      <tr><td><b>✨ Smart (SAM assist)</b></td><td><kbd>S</kbd></td><td>Click an object = positive point, hold and drag = box prompt;
+        the AI generates a polygon preview in real time (blue dashed ghost + confidence score). Corrections are intuitive: <strong>clicking "inside" the preview ghost = automatically a negative point</strong>
+        (subtracts the clicked area from the shape, red dot), clicking "outside" the ghost = positive point (green dot)&mdash;usually <strong>no need to hold Alt</strong>;
+        <kbd>Alt</kbd>+click = force a negative point (wherever you click). You can keep adding points / redrawing the box to refine, and <kbd>Ctrl+Z</kbd> undoes the last point/box step by step;
+        <kbd>Enter</kbd> or the "<strong>✓ Confirm</strong>" button on the floating bar = accept → choose a class to land it as a normal polygon,
+        while <kbd>Esc</kbd> / changing frame / changing tool = clear and start over.</td></tr>
+    </table></div>
+    <div class="note"><b>✨ Smart tool notes</b><br>
+      • Requires the back-end SAM model service to be ready; when not ready it warns "SAM model not ready" (other tools are unaffected).<br>
+      • The first click on a given frame requires a <strong>brief wait</strong> (within ~0.5 s on GPU; several seconds without GPU),
+        and subsequent corrections on the same frame are nearly instant.<br>
+      • Polygon vertex cap is <strong>150</strong>: even at the finest slider setting, if it would exceed the cap the system automatically increases the simplification strength to converge under 150
+        (too many vertices makes later point-by-point editing painful).<br>
+      • <strong>Precision slider</strong> (floating bar at the bottom-left of the canvas, appears under the smart tool): controls how many polygon vertices there are&mdash;"finer" means more vertices that hug the shape more tightly,
+        "simpler" means fewer vertices that are easier to edit; the current preview's vertex count is shown live beside it. Default is "<strong>Auto</strong>" (the system tunes to a moderate vertex count);
+        dragging the slider switches to a manual value (which is remembered and reused next time), and the "Auto" button switches back at any time. Dragging only changes the simplification level; the positive/negative points and box you've placed are all preserved.<br>
+      • Once landed it is a <strong>normal polygon annotation</strong> (single frame, interpolation off): you can edit vertices, copy, delete, and export it as usual.</div>
+    <p>Finish → the class menu pops up → choose a class → save (the flow in Section 5). A crosshair appears while drawing to help you line up; <kbd>Esc</kbd> cancels the drawing.</p>
+    <div class="tip">Clicking <strong>beyond the image bounds</strong> is fine too&mdash;the system automatically takes the point on the image boundary nearest the mouse as the vertex
+      (the coordinate snaps to the boundary), so drawing an edge-hugging bbox / polygon doesn't require pixel-perfect aim.</div>
+
+    <h3>Keypoint + linear interpolation (let one box move across multiple frames)</h3>
+    <p>Spatial annotations <strong>have a time span</strong> (start/end frame). You don't have to draw every frame&mdash;just adjust the shape at the <strong>key frames</strong>,
+       and the system automatically interpolates the positions in between.</p>
+    <ol class="steps">
+      <li>Draw the shape (the first keypoint lands on the current frame).</li>
+      <li>With the <b>⬚ Select</b> tool select it, press <kbd>E</kbd> (or <strong>quickly double-click with the left button</strong> on that annotation) to enter edit mode, then play or jump to a later frame.</li>
+      <li><strong>Drag the shape body or one of the white vertex handles</strong>&mdash;this saves a new keypoint <strong>on the current frame</strong>
+        (the annotation's time range automatically extends to cover this frame).</li>
+      <li>For every frame between two keypoints, the shape position is computed automatically by <strong>linear interpolation</strong>.</li>
+    </ol>
+    <div class="note"><b>Interpolation rules (the details panel has an "interpolation" toggle)</b><br>
+      • Interpolation on: between the preceding and following keypoints, if the vertex counts match → per-coordinate linear interpolation; if the vertex counts differ (a polygon gained or lost points) → hold the previous keypoint (hold); beyond the two ends → take the nearest end's shape.<br>
+      • Interpolation off: the shape is only shown on frames that <strong>have a keypoint</strong>.</div>
+    <p>After selecting a spatial annotation, the details panel lists all keypoints (<b>◆ f123</b>): click one to jump to that frame, or ✕ to delete that keypoint (at least one must remain).
+       The transport's <b>◆◀ / ▶◆</b> jump to the previous / next keypoint; the spatial track on the timeline also marks keypoint positions with the ◆ diamond.</p>
+
+    <h3>Editing shapes and vertices (after selecting, press <kbd>E</kbd>, or left-double-click the annotation, to enter edit mode)</h3>
+    <ul>
+      <li><b>Select first, then press <kbd>E</kbd></b>: without edit mode it is pure browsing (clicking a shape only selects it, no accidental drag);
+          only after entering do the white vertex handles appear and become draggable. Press <kbd>E</kbd> again / press <kbd>Esc</kbd> / select another annotation to leave.</li>
+      <li><b>Move</b>: drag the shape body&mdash;<strong>it stops at the image boundary on contact</strong>, so moving the whole shape never pushes it off-frame.
+          <b>Reshape</b>: drag a white vertex handle (a bbox's four corners, an ellipse's four axis ends, or each vertex of a polygon/polyline);
+          dragging a single vertex beyond the image still <strong>snaps to the nearest boundary point</strong> as before. Each drag = save a keypoint on the current frame.</li>
+      <li><b><kbd>Ctrl</kbd>+click</b> (polygon / polyline, in edit mode): clicking <strong>on an edge</strong> inserts a vertex; clicking <strong>on an existing vertex</strong> deletes that vertex.</li>
+      <li><b><kbd>Alt</kbd>+left-drag</b> (polygon, in edit mode): <strong>redraw a stretch of edge along the mouse path</strong>&mdash;
+          from near an edge hold Alt and drag out the desired new contour (a pink preview line), and on release the "old edge segment closer to the path" is replaced by the path you drew.
+          Too short a path, or a start/end too far from the edge (&gt;40px), prompts and is not applied.</li>
+      <li><b>Quick way to enter edit mode</b>: under the Select tool, a <strong>quick left-double-click</strong> on an annotation = select it and enter edit mode directly (same as pressing <kbd>E</kbd>).</li>
+      <li>After editing, <kbd>Ctrl+Z</kbd> undoes as usual (including Alt+drag redraws).</li>
+    </ul>
+
+    <h3>Copy / paste shapes</h3>
+    <ul>
+      <li><kbd>Ctrl+C</kbd>: copy the <strong>currently selected</strong> shape (as positioned on the current frame).</li>
+      <li><kbd>Ctrl+Shift+C</kbd>: copy <strong>all visible</strong> shapes on the current frame.</li>
+      <li><kbd>Ctrl+V</kbd>: paste onto the current frame (class and position preserved, becoming a new independent annotation).</li>
+      <li>For batch copy after a multi-selection (<kbd>Shift</kbd>+left-click), see "Multi-selection and batch operations" in Section 8.</li>
+    </ul>
+
+    <h3>Video zoom (for small objects)</h3>
+    <ul>
+      <li><kbd>Ctrl</kbd>+scroll: zoom the video centered on the cursor (up to 10x).</li>
+      <li>Scroll = vertical pan, <kbd>Shift</kbd>+scroll = horizontal pan&mdash;<strong>only active when zoomed in (&gt;100%)</strong>;
+        at 100% scroll does not move the frame, and panning cannot go beyond the image edges either.</li>
+      <li>When zoomed in (&gt;100%), a thin <strong>scroll bar</strong> appears on the <strong>bottom / right edge</strong> of the frame:
+        drag the thumb or click the track to pan left/right / up/down (the range likewise stays within the image edges); it hides automatically at ≤100%.</li>
+      <li><strong>Double-click</strong> in the video area to reset the zoom (no accidental reset while drawing or selecting).</li>
+    </ul>
+
+    <div class="note"><b>Current spatial tool coverage</b>: box / polygon / point / ellipse / polyline, plus the built-in ✨ SAM smart assist
+      (above in this section)&mdash;enough for everyday annotation. A <strong>pixel brush mask</strong> is not available yet: when you need
+      per-pixel segmentation, annotate with polygons (or the polygons SAM generates), which export as segmentation in COCO.</div>
+  </section>
+
+  <!-- 8 ============================================================= -->
+  <section id="s8">
+    <h2 class="sec"><span class="num">8</span>Timeline and layers panel</h2>
+
+    <h3>Timeline (MOSaiC-style split tracks, three-level tree)</h3>
+    <p>The left gutter of the bottom timeline is a <strong>three-level tree</strong> structure:</p>
+    <ul>
+      <li><b>Level 1</b>: the two top groups <b>TEMPORAL</b> / <b>SPATIAL</b>.</li>
+      <li><b>Level 2</b>: under TEMPORAL, grouped by layer (PHASE / ACTION / EVENT / TRIPLET);
+        under SPATIAL, grouped by <strong>shape type</strong> (▭ bbox, ⬠ polygon, • point, ⬭ ellipse, 〰 polyline).</li>
+      <li><b>Level 3</b>: <strong>each annotated class gets its own track</strong>&mdash;different classes are never mixed in the same row.</li>
+      <li><b>▸/▾ collapse</b>: the first two levels' headers have a collapse/expand button at their left edge (clicking the left half of the header row also works)&mdash;collapsing only <strong>folds the tracks below to shorten the view</strong>,
+        it is <strong>not hiding the annotations</strong> (they still show on the video and in the layers panel; the 👁 eye button behavior is unchanged).</li>
+      <li>If a class's annotations overlap in time, that track automatically <strong>stacks into multiple lanes</strong> so they don't cover each other.</li>
+      <li>The <b>◆ diamond</b> on a spatial track = a keypoint position.</li>
+      <li>The <b>👁</b> at the right edge of each gutter row: layered hide (see below); a class track also has a <b>☑</b>: select all annotations of that class (see "Multi-selection and batch operations").</li>
+    </ul>
+
+    <h3>Layered hide (👁)</h3>
+    <p>Hiding has <strong>four levels</strong>; the eye buttons in the timeline gutter and in the far-right layers panel mirror each other with the same effect:</p>
+    <ul>
+      <li><b>Whole layer</b>: the 👁 on a group header (PHASE / ACTION / EVENT / TRIPLET / SPATIAL) → hide all annotations of that layer in one click.</li>
+      <li><b>Whole shape type</b> (spatial only): the 👁 on a shape subgroup (e.g. ▭ bbox) → hide all annotations of that shape.</li>
+      <li><b>Single class</b>: the 👁 on a class track / class header → hide all annotations of that class.</li>
+      <li><b>Single annotation</b>: the 👁 on each entry in the layers panel (the original behavior).</li>
+    </ul>
+    <p>Hidden annotations are not drawn on the video and are dimmed on the timeline; this affects display only, the data is untouched. Click the 👁 again (shown as 🚫) to restore.</p>
+
+    <h3>Multi-selection and batch operations (Shift+left-click / ☑ select-all)</h3>
+    <ul>
+      <li><kbd>Shift</kbd>+left-click an annotation on the <strong>timeline</strong> or the <strong>video frame</strong> = add to / remove from the multi-selection
+        (layers-panel entries can be <kbd>Shift</kbd>+clicked too). Multi-selected annotations are marked with a <strong>blue dashed frame</strong>.</li>
+      <li><b>☑ Select all of a class</b>: the <b>☑</b> next to the 👁 on the timeline gutter's class track, and on the layers-panel class header&mdash;
+        one click adds <strong>all annotations</strong> of that class to the multi-selection; click again to cancel. It combines with Shift+click to keep adding/removing.</li>
+      <li>When there is a multi-selection, a <strong>blue batch-operation bar</strong> appears above the timeline: it shows the selected count and
+        offers "<b>🏷 Change class…</b>" (batch-change label, only supported within one layer of selection), "<b>🗑 Batch delete</b>," and "✕ Clear selection."</li>
+      <li><kbd>Del</kbd>: <strong>batch-delete</strong> the multi-selected annotations (one confirmation).</li>
+      <li><kbd>Ctrl+C</kbd> → <kbd>Ctrl+V</kbd>: <strong>batch copy</strong>. Spatial copies each annotation's shape on the current frame and pastes onto the current frame;
+        temporal uses the <strong>earliest start in the selection as the anchor</strong>, and on paste the whole group shifts together&mdash;the earliest one's start lands on the current frame, the rest keep their relative positions and lengths.</li>
+      <li>An ordinary click (without Shift) on any annotation clears the multi-selection and returns to single selection.</li>
+    </ul>
+
+    <h3>Zoom, pan, navigation</h3>
+    <ul>
+      <li><b>Overview strip</b> (the thin strip at the very top): the annotation distribution across the whole video, with an orange box marking the current view window; click or drag it to jump quickly.</li>
+      <li>Plain <b>scroll</b>: <strong>scroll the timeline up/down</strong> (when there are more tracks than fit the height);
+          <kbd>Shift</kbd>+scroll: <strong>pan horizontally</strong>; <kbd>Ctrl</kbd>+scroll: zoom centered on the cursor,
+          all the way down to a <strong>frame-by-frame grid</strong>.</li>
+      <li>The <b>zoom button</b> at the bottom-right (shows the current level): each click advances one level, 100% → 200% → 400% → 800% → frame level, then back to 100%.</li>
+      <li>At the boundary between the video and the timeline there is a <b>divider</b> (with a short bar in the middle): hold and drag it up/down to adjust the video / timeline height ratio.</li>
+      <li>Clicking a blank spot on a track = jump to that time; hovering shows the time (or frame) at that position.</li>
+      <li>After selecting a segment and pressing <kbd>E</kbd> to enter edit mode, you can <strong>drag the left/right edges</strong> to change start/end (a spatial range cannot shrink inside a keypoint);
+          selecting an annotation makes the video jump to its start in sync.</li>
+    </ul>
+
+    <h3>Layers panel (the far-right "Annotations" area)</h3>
+    <ul>
+      <li>Lists only the annotations <strong>under the current playhead frame</strong> (temporal = the start/end covers the current frame; spatial = the frame has a shape),
+        updating live as the playhead moves; the title shows "This frame N."</li>
+      <li>Structure: layer header → (spatial then subdivides into shape-type headers) → class header → individual annotations.
+        The class header shows a color dot + class name + <strong>the number in parentheses = that class's total annotation count across the whole video</strong>;
+        each entry shows the time range (temporal) or shape + frame range (spatial).</li>
+      <li><b>👁</b>: on headers at every level and on individual entries&mdash;corresponding to the four-level layered hide above.</li>
+      <li><b>🗑</b>: delete that entry.</li>
+      <li><b>Click an entry</b>: select it and jump to its start (spatial jumps to the first keypoint); <kbd>Shift</kbd>+click = add to multi-selection.</li>
+    </ul>
+
+    <h3>Selection details panel</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Field / button</th><th>Effect</th></tr>
+      <tr><td>Start / End + <b>⌖</b></td><td>Enter the start/end frame directly; ⌖ = set to the current frame.</td></tr>
+      <tr><td>instrument / verb / target</td><td>The triplet-only three dropdowns.</td></tr>
+      <tr><td>Interpolation toggle + keypoints list</td><td>Spatial only: toggle linear interpolation; each ◆ f123 can be clicked to jump, or ✕ to delete.</td></tr>
+      <tr><td>Sampling "Generate events…"</td><td>Temporal only, see Section 9.</td></tr>
+      <tr><td>Jump to start / hide / delete</td><td>Common actions.</td></tr>
+    </table></div>
+  </section>
+
+  <!-- 9 ============================================================= -->
+  <section id="s9">
+    <h2 class="sec"><span class="num">9</span>Sampling to generate events</h2>
+    <p>Sometimes you want to place an event marker every fixed number of seconds within "a span" (e.g. sample one point every 30 seconds for quality checking). No need to click them one by one:</p>
+    <ol class="steps">
+      <li>Select a temporal segment (any of phase / action / event / triplet).</li>
+      <li>In the details panel click <b>"Generate events…"</b>.</li>
+      <li>A dialog pops up; choose the <strong>interval</strong> (every 5 / 10 / 30 / 60 seconds, default 30) and the <b>event class</b> to generate.</li>
+      <li>The dialog previews "will generate N events" live; confirm and click <strong>Generate</strong>.</li>
+    </ol>
+    <p>The system generates a 1-frame event annotation every N seconds, starting <strong>from the segment's start (inclusive)</strong>.</p>
+    <div class="warn">If the dropdown has no event class to choose, this project's taxonomy has no event yet
+      → first annotate any span with the ⏱ Segment tool and <strong>type to add</strong> an event class in the event tab of the class menu (Section 10).</div>
+  </section>
+
+  <!-- 10 ============================================================= -->
+  <section id="s10">
+    <h2 class="sec"><span class="num">10</span>Label management</h2>
+    <p><strong>The class list (taxonomy) now lives in each project's database</strong> (the registry's projects / labels tables),
+       each project independent&mdash;<strong>no longer editing yaml files</strong>.</p>
+
+    <h3>Method A: add directly in the class menu (use this day-to-day)</h3>
+    <ol class="steps">
+      <li>Draw a shape or annotate a time segment as usual → the class menu pops up.</li>
+      <li><strong>Type the new class name</strong> in the search box (e.g. <code>clip_applier</code>).</li>
+      <li>"<b>＋ Add 'clip_applier' to spatial</b>" appears at the bottom of the list → click it or press <kbd>Enter</kbd>.</li>
+      <li>The new class is added to <strong>this project's</strong> taxonomy immediately and applied to the shape you just drew, and everyone can select it afterward. Spatial classes are auto-assigned a color.</li>
+    </ol>
+
+    <h3>Method B: create a separate project (for a major taxonomy overhaul)</h3>
+    <p>If you need a <strong>completely different</strong> set of classes (e.g. a different type of surgery), just <strong>create a new project</strong> on the landing page&mdash;
+       the new project has its own clean taxonomy, independent of the old project.</p>
+
+    <div class="note"><b>What about the yaml files?</b> <code>pipeline/configs/labels_*.yaml</code> now only serves as
+      the <b>initial seed for the default project</b> and the <b>fallback lists for the triplet three dropdowns (instrument/verb/target)</b>;
+      day-to-day class additions/edits are done in the interface, take effect immediately, and require no restart. To adjust the triplet dropdown contents, ask an administrator.</div>
+    <div class="warn">A new class <strong>cannot be deleted or renamed from the interface</strong> (to avoid invalidating existing annotations). To truly clean up the taxonomy, ask an administrator to handle the database.</div>
+  </section>
+
+  <!-- 11 ============================================================= -->
+  <section id="s11">
+    <h2 class="sec"><span class="num">11</span>Complete keyboard shortcut table</h2>
+    <p>Identical to the interface's "☰ Menu → ⌨ Shortcut list":</p>
+    <div class="tbl-wrap"><table>
+      <tr><th style="width:230px">Key</th><th>Function</th></tr>
+      <tr><td><kbd>V</kbd></td><td>Select tool</td></tr>
+      <tr><td><kbd>T</kbd></td><td>Start a time-segment annotation (start = current frame); press again while annotating = cancel</td></tr>
+      <tr><td><kbd>T</kbd> → <kbd>Enter</kbd></td><td>Set the end → class menu (default = last class) → press <kbd>Enter</kbd> again to confirm directly</td></tr>
+      <tr><td><kbd>E</kbd></td><td>With an annotation selected: enter/leave edit mode (enables dragging handles and edges); with nothing selected = ellipse tool</td></tr>
+      <tr><td><kbd>B</kbd> / <kbd>P</kbd> / <kbd>O</kbd> / <kbd>E</kbd> / <kbd>L</kbd></td><td>Box / polygon / point / ellipse / polyline</td></tr>
+      <tr><td><kbd>S</kbd></td><td>✨ Smart tool (SAM assist): click = positive point, click inside preview = auto negative point, <kbd>Alt</kbd>+click = force negative point, hold and drag = box prompt</td></tr>
+      <tr><td><kbd>S</kbd> → <kbd>Enter</kbd> (or the "✓ Confirm" button on the floating bar)</td><td>Accept the SAM preview → class menu → land as a polygon; <kbd>Esc</kbd>/change frame/change tool = clear the prompt</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd> (smart tool)</td><td>Undo the last prompt (point/box) step by step; once all prompts are undone = ordinary undo</td></tr>
+      <tr><td>Quick left-double-click (on a video annotation)</td><td>Select tool: select that annotation and enter edit mode (same as <kbd>E</kbd>)</td></tr>
+      <tr><td><kbd>Alt</kbd>+left-drag (edit mode, polygon)</td><td>Redraw that edge segment along the mouse path (applied on release; <kbd>Ctrl+Z</kbd> undoes)</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+      <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / next annotation (skips hidden ones; collapsing does not count as hiding)</td></tr>
+      <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>±1 frame</td></tr>
+      <tr><td><kbd>Shift+←/→</kbd></td><td>±10 frames</td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>Segment: set end / confirm default class; finish a polygon/polyline</td></tr>
+      <tr><td>Zoom button (timeline, bottom-right)</td><td>Each click cycles one level: 100% → 200% → 400% → 800% → frame → 100%</td></tr>
+      <tr><td>Double-click a timeline annotation</td><td>Edit dialog (change class/start-end, synced with the video)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Cancel drawing / close panel</td></tr>
+      <tr><td><kbd>Del</kbd></td><td>Delete the selected annotation</td></tr>
+      <tr><td><kbd>N</kbd></td><td>Auto-apply the last class (no menu after drawing) on/off</td></tr>
+      <tr><td><kbd>Ctrl+click</kbd></td><td>Polygon/polyline: add (on edge) / delete (on point) a vertex</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo the last action (add/delete/modify all work; a batch operation is undone all at once; while drawing a polygon = remove the last vertex)</td></tr>
+      <tr><td><kbd>Ctrl+Shift+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>Redo (undo the undo)</td></tr>
+      <tr><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td><td>Copy selection / paste shape onto the current frame</td></tr>
+      <tr><td><kbd>Shift</kbd>+left-click (video/timeline)</td><td>Multi-select annotations (add / remove)</td></tr>
+      <tr><td>Gutter ☑ button</td><td>Select all annotations of that class (add to multi-selection; click again to cancel)</td></tr>
+      <tr><td><kbd>Del</kbd> after multi-select</td><td>Batch delete (one confirmation)</td></tr>
+      <tr><td>"Change class…" after multi-select</td><td>Batch-change label (only within one layer)</td></tr>
+      <tr><td><kbd>Ctrl+C</kbd> → <kbd>Ctrl+V</kbd> after multi-select</td><td>Batch copy; spatial copies the current-frame shapes, temporal shifts the whole group to the current frame</td></tr>
+      <tr><td>Gutter ▸/▾ button</td><td>Collapse/expand a track group (folds the view only, does not hide annotations)</td></tr>
+      <tr><td>Eye button (gutter / right panel)</td><td>Layered hide: layer / shape / class / single annotation</td></tr>
+      <tr><td><kbd>Ctrl+scroll (video)</kbd></td><td>Video zoom; double-click a blank area to reset</td></tr>
+      <tr><td>Scroll (video, zoom&gt;100%)</td><td>Pan up/down; <kbd>Shift</kbd>+scroll = pan left/right; you can also drag the scroll bar on the bottom/right edge of the frame</td></tr>
+      <tr><td>Scroll (timeline)</td><td>Scroll up/down; <kbd>Shift</kbd>+scroll = pan horizontally</td></tr>
+      <tr><td><kbd>Ctrl+scroll (timeline)</kbd></td><td>Timeline zoom (centered on the cursor)</td></tr>
+      <tr><td>Drag the video/timeline divider</td><td>Adjust the height ratio between the two</td></tr>
+    </table></div>
+
+    <p>Additional (not listed in the interface, but available):</p>
+    <div class="tbl-wrap"><table>
+      <tr><th style="width:230px">Key</th><th>Function</th></tr>
+      <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>Jump to the start / end of the video</td></tr>
+      <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Copy all visible shapes on the current frame</td></tr>
+      <tr><td><kbd>Backspace</kbd></td><td>Same as <kbd>Del</kbd> (delete selection)</td></tr>
+      <tr><td>Double-click (while drawing a polygon/polyline)</td><td>Same as <kbd>Enter</kbd> to finish</td></tr>
+      <tr><td><kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>Enter</kbd> in the class menu</td><td>Move / select a class</td></tr>
+    </table></div>
+    <div class="note">Shortcuts do not fire while the cursor is in an input box / dropdown (to avoid accidental triggers while typing). While any dialog is open, only <kbd>Esc</kbd> (close) is active.</div>
+  </section>
+
+  <!-- 12 ============================================================= -->
+  <section id="s12">
+    <h2 class="sec"><span class="num">12</span>Exporting datasets</h2>
+
+    <h3>Method A: the project page's "📦 Download dataset" (no terminal needed)</h3>
+    <p>The top half is an <strong>interactive download form</strong>; combine four options freely and download a zip directly:</p>
+    <ol class="steps">
+      <li><b>Format</b>:
+        <ul>
+          <li><b>MOSaiC JSON</b>: one MOSaiC-format JSON per video (temporal + spatial annotations).</li>
+          <li><b>COCO</b>: spatial annotations converted to COCO (object detection / segmentation).</li>
+          <li><b>YOLO</b>: spatial annotations converted to YOLO (detection + segmentation txt + <code>data.yaml</code>).</li>
+        </ul></li>
+      <li><b>Content</b>: <b>label + images</b> (annotations + corresponding frames) or <b>label only</b> (annotation files only, no images).</li>
+      <li><b>Scope</b>: <b>all</b> / <b>spatial only</b> / <b>temporal only</b> /
+        <b>filter spatial by temporal rules</b>&mdash;check one or more temporal classes (<strong>multi-select = union</strong>,
+        e.g. checking two events at once), exporting only the spatial annotations that fall within any checked class's annotation time range.
+        Combined with "sampling to generate events" (Section 9), this yields an <strong>evenly sampled</strong> spatial dataset.</li>
+      <li><b>Class selection</b>: lists all classes in the project taxonomy (all selected by default); just uncheck the ones you don't want.</li>
+      <li>Click "<b>⬇ Download dataset</b>" → when the export finishes the browser downloads the zip directly (may take a few minutes depending on annotation volume; don't close the page).</li>
+    </ol>
+    <p>The bottom half, "<b>Other exports (original flow)</b>," keeps the original whole-package exports:
+      <b>MOSaiC / COCO / YOLO</b> (no filter applied), <b>temporal</b> (CSV + JSON snapshot), <b>spatial</b> (COCO + extracted frames)
+      &mdash;after clicking "Export," statistics appear along with an <b>⬇ Download run_id.zip</b> link.</p>
+    <div class="note"><b>The export scope = this project</b> (only this project's videos and annotations).
+      MOSaiC / COCO / YOLO need to extract images and package them,
+      which may take a few minutes depending on annotation volume; don't close the page during export. The CLI can also limit to a project with <code>-P project-code</code> (see Method B).</div>
+
+    <h3>Method B: the administrator uses the <code>surgann</code> command (conversion to training formats)</h3>
+    <p>Each export creates an independent run directory under <code>data/exports/</code>, containing a complete, reproducible snapshot. Common commands:</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Command</th><th>Output</th></tr>
+      <tr><td><code>surgann export-dataset -f yolo</code> (or <code>-f mosaic</code> / <code>-f coco</code>)</td>
+          <td>The same three dataset exports as Method A: YOLO detection + segmentation (<code>images/ labels/ labels_seg/ data.yaml</code> + <code>images_meta.csv</code> sidecar)
+              / MOSaiC JSON + images / COCO + images.</td></tr>
+      <tr><td><code>surgann export-dataset -f frame-pairs --interval sample_5s</code></td>
+          <td>temporal → <b>frame–label pairs</b> (sampled frame JPEGs + <code>image_label_pairs.csv</code>).</td></tr>
+      <tr><td><code>surgann export-dataset -f clip --cut</code></td>
+          <td>temporal → <b>clip–label pairs</b> (<code>clip_label_pairs.csv</code>; <code>--cut</code> also cuts out <code>clips/*.mp4</code>).</td></tr>
+      <tr><td><code>surgann export-temporal</code> / <code>export-spatial</code></td>
+          <td>The same two exports as Method A (CSV + JSON snapshot / COCO + extracted frames).</td></tr>
+      <tr><td><code>-P project-code</code> (e.g. <code>surgann export-dataset -f yolo -P default</code>)</td>
+          <td>Can be added to <code>export-dataset</code> / <code>export-temporal</code> / <code>export-spatial</code>,
+              limiting the export to <b>that project</b>; omit = the whole registry.</td></tr>
+      <tr><td><code>surgann derive</code></td>
+          <td>Derives a frame-level label CSV of every-5s / 30s sample points from the continuous segments.</td></tr>
+      <tr><td><code>surgann export-mosaic --video ABCD_0001</code> / <code>import-mosaic</code></td>
+          <td>Convert to/from the <b>MOSaiC</b> platform JSON format (coordinate percentage ↔ pixel converted automatically, round-trip safe).</td></tr>
+    </table></div>
+    <p>All time-bearing outputs obey <code>time = frame ÷ fps</code> and self-check after writing, so a time-misaligned dataset is never produced.</p>
+  </section>
+
+  <!-- 13 ============================================================= -->
+  <section id="s13">
+    <h2 class="sec"><span class="num">13</span>Frequently asked questions</h2>
+
+    <h3>Video not showing up in the project?</h3>
+    <p>A video must first be <strong>ingested</strong>, and it must be <strong>added to this project</strong> (Section 2). For an already-ingested video:
+       use "＋ Add video" on the "🎬 Videos" tab or "＋ Add to this project" on "📥 Upload data."
+       For a not-yet-ingested one: go to "📥 Upload data," choose a series, then click "Ingest" (for a patient folder use the "📥 Video ingest" page); if the file is not in the scan table,
+       ask the administrator to place the video into the server's <code>data/raw_videos/</code> and refresh. An administrator can also ingest it via command:</p>
+    <pre><code>surgann ingest data/raw_videos/your_video.mp4 --video-id ABCD_0004</code></pre>
+
+    <h3>Clicked Ingest and nothing happened for a long time?</h3>
+    <p>Transcoding (standardizing to 25fps) takes a few minutes depending on the video's length; the status column shows "⏳ Ingesting…" and updates automatically, and when done the "🎬 Videos" tab gets a new card. If a ✗ error message appears, forward it to the administrator.</p>
+
+    <h3>Drew a shape but pressed Esc and the annotation disappeared?</h3>
+    <p>Normal&mdash;pressing <kbd>Esc</kbd> while the class menu is showing means <strong>discard</strong> this drawing, and the shape is not saved. To keep it you must choose a class.</p>
+
+    <h3>Too many annotations on the frame, covering each other?</h3>
+    <p>Use <b>👁</b> layered hide (Section 8): you can hide a whole layer (e.g. all of spatial), a whole shape type, a single class, or a single annotation in one click&mdash;
+       both the timeline gutter and the layers panel have eye buttons. Click back to show them when done. Hiding affects display only; the data is untouched.</p>
+
+    <h3>A spatial shape looks wrong on another frame?</h3>
+    <p>That's the position <strong>linear interpolation</strong> filled in between two keypoints. Go to the frame where it's off and drag the shape to the right place&mdash;this saves a new keypoint and the interpolation is corrected.
+       If this object shouldn't move continuously (e.g. it only appears for a few instants), turn off "interpolation" in the details panel, and the shape will only show on keypoint frames.</p>
+
+    <h3>Where are my annotations stored? Could they be lost?</h3>
+    <p>Every action is <strong>written to the registry immediately</strong> (<code>registry/registry.db</code>), not held temporarily in the browser; switching videos or closing the tab won't lose anything.
+       The administrator periodically makes snapshot backups with <code>surgann backup</code>.</p>
+
+    <h3>Annotation positions seem to have a time offset?</h3>
+    <p>Check whether the video passed ingest's constant-frame-rate (CFR 25fps) validation&mdash;only variable-frame-rate (VFR) videos drift.
+       <code>surgann status</code> should show fps=25.</p>
+
+    <h3>Added a class by mistake and want to delete it?</h3>
+    <p>The interface does not offer deleting a class (to avoid invalidating existing annotations); ask an administrator to handle it. The annotations themselves can be deleted at any time (<b>🗑</b> or <kbd>Del</kbd>).</p>
+
+    <h3>Want to change the interface port?</h3>
+    <p>An administrator changes <code>ANNOTATOR_PORT</code> in <code>deploy/.env</code>, or at startup uses <code>surgann annotate --port &lt;number&gt;</code>.</p>
+
+    <h3>Can I annotate pixel-level masks?</h3>
+    <p>Currently box / polygon / point / ellipse / polyline and ✨ SAM smart assist are available (Section 7); a pixel brush is not.
+       For segmentation, annotate with polygons (SAM generates contour-hugging polygons in one click) &mdash; they export as segmentation in COCO.</p>
+  </section>
+
+  <footer>
+    SurgAnnFlow Annotator ・ Surgical Video Annotation Platform User Manual ・ For questions, first check the
+    <a href="#s13">FAQ</a>, or ask the platform administrator.
+  </footer>
+
+</div>
+<script>(function(){try{if(localStorage.getItem("surgann_lang")!=="en")location.replace("guide.html");}catch(e){}var b=document.getElementById("langToggle");if(b)b.onclick=function(e){e.preventDefault();try{localStorage.setItem("surgann_lang","zh");}catch(x){}location.href="guide.html";};})();</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# 專案建置設定：讓 pipeline/ 成為可安裝套件，並註冊指令 surgann（薄入口，邏輯在 pipeline/ 內）。
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surgann"
+version = "0.1.0"
+description = "Surgical video annotation platform (self-hosted SurgAnnFlow annotator + Python pipeline)"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12",
+    "rich>=13",
+    "pyyaml>=6",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    # SAM 輔助標註（pipeline/sam_assist/）與 OOB 推論共用的影像/陣列套件
+    "numpy>=1.26",
+    "opencv-python-headless>=4.10",
+    # onnxruntime 刻意不列在這裡：CPU 版（onnxruntime）與 GPU 版（onnxruntime-gpu）互斥、
+    # 且 GPU 版必須依顯卡世代鎖版。安裝時依機器擇一配方（見 deploy/requirements-*.txt）：
+    #   pip install -e . -r deploy/requirements-cpu.txt   # 無 NVIDIA GPU
+    #   pip install -e . -r deploy/requirements-gpu.txt   # 有 NVIDIA GPU
+    # 漏裝時 surgann doctor 會以 FAIL 指出。
+]
+
+[project.scripts]
+surgann = "pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+# 自動收錄 pipeline 底下所有子套件（annotator / sam_assist / migrations …），避免新增子套件時漏列
+include = ["pipeline", "pipeline.*"]
+
+[tool.setuptools.package-data]
+# models/oob/：隨 repo 附帶的 OOB ONNX 模型與其授權說明（CC BY-NC-SA 4.0）
+pipeline = ["configs/*.yaml", "annotator/static/*", "models/oob/*.onnx", "models/oob/*.md"]

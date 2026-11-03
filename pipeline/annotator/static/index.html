@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title data-i18n="idx.title">SurgAnnFlow — 專案</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css?v=20261102-1">
+<script src="i18n.js?v=20261102-1"></script>
+</head>
+<body class="landing">
+<header id="topbar">
+  <span class="brand">SurgAnnFlow</span>
+  <span class="dim" data-i18n="nav.projects">專案</span>
+  <span class="spacer"></span>
+  <a class="topbar-link" href="upload.html" data-i18n="nav.upload">📥 影片入庫</a>
+  <a class="topbar-link" href="guide.html" target="_blank" rel="noopener" data-i18n="nav.guide">📖 使用手冊</a>
+  <button class="topbar-link" id="langToggle" type="button"></button>
+  <span id="landAnnotator" class="dim"></span>
+</header>
+
+<main id="landMain">
+  <h2 class="land-h" data-i18n="idx.h_projects">專案</h2>
+  <div id="projGrid" class="card-grid"></div>
+
+  <!-- 影片庫：系列資料夾兩層式（先列系列，點進去才列影片；點影片＝純瀏覽模式） -->
+  <h2 class="land-h"><span data-i18n="idx.h_library">影片庫</span> <span id="libCount" class="dim"></span>
+    <a class="topbar-link" href="upload.html" style="margin-left:12px;font-weight:400" data-i18n="nav.upload">📥 影片入庫</a>
+  </h2>
+  <div class="panel-note" data-i18n-html="idx.lib_note">
+    影片只入庫一次，之後在各專案「＋ 加入影片」引用（不複製檔案）。
+    影片依<b>系列</b>（資產層分群）歸入資料夾；系列在「📥 影片入庫」頁建立與管理，影片編號依系列自動配號。
+    從影片庫點開影片＝<b>純瀏覽</b>（不顯示標註）；要標註請從專案頁進入。
+  </div>
+  <div id="libCrumb" class="panel-note hidden" style="margin-top:-6px">
+    <a href="#" id="libBack" class="dl-link" data-i18n="idx.lib_back">← 回系列清單</a>
+    <span id="libCrumbName" style="margin-left:8px"></span>
+  </div>
+  <div id="libGrid" class="card-grid"></div>
+</main>
+
+<!-- 建立專案 -->
+<div id="newModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head"><h2 data-i18n="idx.new_title">建立專案</h2>
+      <button class="modal-close" id="newClose">✕</button></div>
+    <div class="modal-pad">
+      <div class="mfield"><label data-i18n="idx.f_name">專案名稱</label>
+        <input id="npName" placeholder="如 Cholecystectomy Phases" data-i18n-ph="idx.f_name_ph"></div>
+      <div class="mfield"><label data-i18n="idx.f_type">類型</label>
+        <select id="npType">
+          <option value="temporal" data-i18n="idx.opt_temporal">temporal（時間軸標註）</option>
+          <option value="spatial" data-i18n="idx.opt_spatial">spatial（空間標註）</option>
+          <option value="mixed" selected data-i18n="idx.opt_mixed">mixed（兩者皆有）</option>
+        </select></div>
+      <div class="mfield"><label data-i18n="idx.f_group">Annotation group</label>
+        <input id="npGroup" placeholder="這個專案在標什麼，如 surgical phases" data-i18n-ph="idx.f_group_ph"></div>
+      <div class="mfield"><label data-i18n="idx.f_code">專案編碼（選填）</label>
+        <input id="npCode" placeholder="固定識別碼（英數-_），如 chole-phase；留空自動產生" data-i18n-ph="idx.f_code_ph"></div>
+      <div class="mfield"><label data-i18n="idx.f_copy">複製既有專案的類別（不複製標註）</label>
+        <select id="npCopyFrom"><option value="" data-i18n="idx.opt_nocopy">— 不複製 —</option></select></div>
+    </div>
+    <div class="modal-foot" style="text-align:right">
+      <button class="primary" id="npCreate" data-i18n="idx.create">建立</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method, headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch {} throw new Error(`${r.status} ${d}`); }
+  return r.json();
+}
+
+async function render() {
+  const host = $("projGrid");
+  host.innerHTML = "";
+  let projects = [];
+  try { projects = await api("GET", "/api/projects"); } catch (e) {}
+  // 建立專案 modal：「複製既有專案的類別」下拉（預設不複製）
+  $("npCopyFrom").innerHTML = `<option value="">${t("idx.opt_nocopy")}</option>` +
+    projects.map(p => `<option value="${p.project_id}">${p.name.replace(/</g, "&lt;")}（${p.project_id}）</option>`).join("");
+  for (const p of projects) {
+    const card = document.createElement("a");
+    card.className = "pcard";
+    card.href = `project.html?p=${encodeURIComponent(p.project_id)}`;
+    card.innerHTML =
+      `<div class="ptitle">${p.name}<span class="badge ptype">${p.project_type}</span></div>` +
+      `<div class="pmeta">${p.annotation_group || "—"} ・ ${t("idx.videos_suffix", p.n_videos)} ・ ` +
+      `<code class="pid-code">${p.project_id}</code></div>`;
+    host.appendChild(card);
+  }
+  const add = document.createElement("div");
+  add.className = "pcard pcard-new";
+  add.textContent = t("idx.card_new");
+  add.onclick = () => $("newModal").classList.remove("hidden");
+  host.appendChild(add);
+}
+
+$("newClose").onclick = () => $("newModal").classList.add("hidden");
+$("newModal").onclick = (e) => { if (e.target === $("newModal")) $("newModal").classList.add("hidden"); };
+$("npCreate").onclick = async () => {
+  const name = $("npName").value.trim();
+  if (!name) { alert(t("idx.alert_need_name")); return; }
+  try {
+    const p = await api("POST", "/api/projects", {
+      name, project_type: $("npType").value,
+      annotation_group: $("npGroup").value.trim(),
+      code: $("npCode").value.trim(),
+      copy_taxonomy_from: $("npCopyFrom").value,   // 選填：複製來源專案的類別（不複製標註）
+    });
+    location.href = `project.html?p=${encodeURIComponent(p.project_id)}`;
+  } catch (e) { alert(t("idx.alert_create_fail", e.message)); }
+};
+
+// ---- 影片庫：系列資料夾兩層式（第一層＝系列卡，點進去＝該系列影片卡）----
+function fmtDur(sec) {
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+const UNSORTED = "__none__";   // 無系列影片歸入「未分類」資料夾
+const lib = { vids: [], series: [], open: null };   // open: null＝系列層；series_id / UNSORTED＝影片層
+async function renderLibrary() {
+  try {
+    [lib.vids, lib.series] = await Promise.all([api("GET", "/api/videos"), api("GET", "/api/series")]);
+  } catch (e) { $("libGrid").textContent = e.message; return; }
+  drawLibrary();
+}
+function libGroups() {
+  const bySeries = new Map();
+  for (const v of lib.vids) {
+    const k = v.series || UNSORTED;
+    if (!bySeries.has(k)) bySeries.set(k, []);
+    bySeries.get(k).push(v);
+  }
+  return bySeries;
+}
+function drawLibrary() {
+  const grid = $("libGrid");
+  grid.innerHTML = "";
+  const bySeries = libGroups();
+  // 麵包屑：影片層才顯示
+  const sInfo = lib.series.find(s => s.series_id === lib.open);
+  const inFolder = lib.open !== null;
+  $("libCrumb").classList.toggle("hidden", !inFolder);
+  if (inFolder)
+    $("libCrumbName").innerHTML = lib.open === UNSORTED
+      ? t("idx.crumb_unsorted", (bySeries.get(UNSORTED) || []).length)
+      : t("idx.crumb_series", sInfo ? sInfo.name.replace(/</g, "&lt;") : lib.open, lib.open, (bySeries.get(lib.open) || []).length);
+  if (!lib.vids.length) {
+    $("libCount").textContent = "";
+    grid.innerHTML = `<div class="dim">${t("idx.no_videos")}</div>`;
+    return;
+  }
+  if (!inFolder) {   // ---- 第一層：系列資料夾卡 ----
+    const nFolders = lib.series.filter(s => (bySeries.get(s.series_id) || []).length).length +
+                     ((bySeries.get(UNSORTED) || []).length ? 1 : 0);
+    $("libCount").textContent = t("idx.lib_count_series", nFolders, lib.vids.length);
+    for (const s of lib.series) {
+      const n = (bySeries.get(s.series_id) || []).length;
+      if (!n) continue;   // 空系列不佔資料夾（系列管理在入庫頁）
+      const extra = [s.institution, s.surgery_type].filter(Boolean).map(x => x.replace(/</g, "&lt;")).join(" ・ ");
+      const card = document.createElement("a");
+      card.className = "pcard"; card.href = "#";
+      card.innerHTML =
+        `<div class="ptitle">📂 ${s.name.replace(/</g, "&lt;")}<span class="badge series">${s.series_id}</span></div>` +
+        `<div class="pmeta">${t("idx.series_videos", n)}${extra ? ` ・ ${extra}` : ""}</div>`;
+      card.onclick = (e) => { e.preventDefault(); lib.open = s.series_id; drawLibrary(); };
+      grid.appendChild(card);
+    }
+    const un = bySeries.get(UNSORTED) || [];
+    if (un.length) {
+      const card = document.createElement("a");
+      card.className = "pcard"; card.href = "#";
+      card.innerHTML = `<div class="ptitle">📂 ${t("idx.folder_unsorted")}</div>` +
+        `<div class="pmeta">${t("idx.unsorted_card_meta", un.length)}</div>`;
+      card.onclick = (e) => { e.preventDefault(); lib.open = UNSORTED; drawLibrary(); };
+      grid.appendChild(card);
+    }
+    return;
+  }
+  // ---- 第二層：該系列的影片卡（點卡＝純瀏覽模式，不帶專案、不顯示標註）----
+  const list = bySeries.get(lib.open) || [];
+  $("libCount").textContent = t("idx.lib_count_videos", lib.vids.length);
+  if (!list.length) { grid.innerHTML = `<div class="dim">${t("idx.folder_empty")}</div>`; return; }
+  for (const v of list) {
+    const card = document.createElement("a");
+    card.className = "vcard";
+    card.href = `app.html?v=${encodeURIComponent(v.video_id)}`;   // 不帶 p＝純瀏覽
+    card.title = t("idx.vcard_title");
+    const nProj = (v.projects || []).length;
+    const projBadges = (v.projects || []).map(p => `<span class="badge ptype">${p}</span>`).join(" ") ||
+      `<span class="dim">${t("idx.no_projects")}</span>`;
+    card.innerHTML =
+      `<div class="thumb"><img loading="lazy" src="${v.thumb_url}" alt="${v.video_id}"></div>` +
+      `<div class="vinfo">` +
+      `<div class="vtitle">${v.video_id}</div>` +
+      `<div class="vmeta dim">${fmtDur(v.duration_sec)} ・ ${v.width}×${v.height} ・ ${t("idx.proj_count", nProj)}</div>` +
+      `<div class="vmeta">${t("idx.projects_label")}${projBadges}</div>` +
+      `</div>`;
+    grid.appendChild(card);
+  }
+}
+$("libBack").onclick = (e) => { e.preventDefault(); lib.open = null; drawLibrary(); };
+
+(async function () {
+  try {
+    const cfg = await api("GET", "/api/config");
+    $("landAnnotator").textContent = t("topbar.annotator", cfg.annotator);
+  } catch {}
+  render();
+  renderLibrary();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title data-i18n="app.title">SurgAnnFlow Annotator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css?v=20261102-1">
+<script src="i18n.js?v=20261102-1"></script>
+</head>
+<body class="annot">
+<header id="topbar">
+  <span class="brand">SurgAnnFlow</span>
+  <button id="libBtn" title="回影片庫" data-i18n="app.lib" data-i18n-title="app.lib_title">📁 影片庫</button>
+  <div id="menuWrap">
+    <button id="menuBtn" title="選單" data-i18n="app.menu" data-i18n-title="app.menu_title">☰ 選單</button>
+    <div id="menuDrop" class="hidden">
+      <a href="guide.html" target="_blank" rel="noopener" data-i18n="app.menu_guide">📖 使用手冊（新分頁）</a>
+      <button id="menuKeys" data-i18n="app.menu_keys">⌨ 快捷鍵清單</button>
+    </div>
+  </div>
+  <span id="curVideo"></span>
+  <span id="curProject" class="badge ptype" title="目前標註的專案（標註按專案隔離）" data-i18n-title="app.cur_project_title"></span>
+  <span class="spacer"></span>
+  <button class="topbar-link" id="langToggle" type="button"></button>
+  <label class="dim" for="annotatorSel" data-i18n="app.annotator">標註者</label>
+  <select id="annotatorSel" title="標註者（之後的新標註都記在此人名下）" data-i18n-title="app.annotator_sel_title"></select>
+</header>
+
+<main id="main">
+  <!-- 中：影片 + spatial overlay -->
+  <section id="stage">
+    <div id="videoArea">
+      <div id="videoZoom">
+        <video id="video" preload="auto"></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <!-- zoom >100% 時的平移捲動 bar（自繪 thumb 疊在畫布邊緣；≤100% 隱藏）-->
+      <div id="vsbX" class="vsb vsb-x hidden"><div class="vsb-thumb"></div></div>
+      <div id="vsbY" class="vsb vsb-y hidden"><div class="vsb-thumb"></div></div>
+      <!-- ✨ smart 工具的精細度滑桿浮條（polygon 簡化強度；僅 smart 工具下顯示）-->
+      <div id="samBar" class="hidden">
+        <span class="dim" data-i18n="app.sam_fine">精細</span>
+        <input id="samEps" type="range" min="0.5" max="12" step="0.5" value="2"
+               title="polygon 精細度：越左頂點越多越貼合，越右越簡略" data-i18n-title="app.sam_eps_title">
+        <span class="dim" data-i18n="app.sam_coarse">簡略</span>
+        <b id="samEpsVal" data-i18n="app.sam_auto">自動</b>
+        <button id="samEpsAuto" title="回自動模式（自動調整到適中頂點數）" data-i18n="app.sam_auto" data-i18n-title="app.sam_auto_title">自動</button>
+        <span id="samNPts" class="dim"></span>
+        <button id="samOk" class="primary" disabled title="接受目前預覽（Enter）→ 選類別落地" data-i18n="app.sam_ok" data-i18n-title="app.sam_ok_title">✓ 確認（Enter）</button>
+      </div>
+    </div>
+    <!-- 影片下：播放控制 + 時間軸（MOSaiC 式，temporal + spatial 同軌顯示）-->
+    <div id="transport">
+      <button id="btnRewind" title="回到開頭" data-i18n-title="app.t_rewind">⏮</button>
+      <button id="btnPlay" title="播放/暫停 (Space)" data-i18n-title="app.t_play">▶</button>
+      <button id="btnEnd" title="到結尾" data-i18n-title="app.t_end">⏭</button>
+      <select id="speed" title="播放速度" data-i18n-title="app.t_speed">
+        <option value="0.2">0.2x</option><option value="0.5">0.5x</option>
+        <option value="1" selected>1x</option><option value="2">2x</option>
+        <option value="3">3x</option><option value="4">4x</option><option value="5">5x</option>
+      </select>
+      <span class="sep"></span>
+      <button id="btnPrevF" title="上一 frame (Ctrl+←)" data-i18n-title="app.t_prevf">‹</button>
+      <button id="btnNextF" title="下一 frame (Ctrl+→)" data-i18n-title="app.t_nextf">›</button>
+      <input id="gotoFrame" type="number" min="0" placeholder="frame…" title="跳至 frame" data-i18n-ph="app.t_goto_ph" data-i18n-title="app.t_goto_title">
+      <span class="sep"></span>
+      <button id="btnPrevEv" title="上一個標註（跳過隱藏的）(←)" data-i18n-title="app.t_prevev">|◀</button>
+      <button id="btnNextEv" title="下一個標註（跳過隱藏的）(→)" data-i18n-title="app.t_nextev">▶|</button>
+      <button id="btnPrevKp" class="hidden" title="上一個 keypoint" data-i18n-title="app.t_prevkp">◆◀</button>
+      <button id="btnNextKp" class="hidden" title="下一個 keypoint" data-i18n-title="app.t_nextkp">▶◆</button>
+      <span class="sep"></span>
+      <span id="timeDisplay" title="點擊切換 時間/frame" data-i18n-title="app.t_timedisp_title">00:00:00.00 / 00:00:00.00</span>
+      <span class="spacer"></span>
+      <button id="zoomBtn" title="時間軸縮放（Ctrl+滾輪自由縮放）" data-i18n-title="app.t_zoom_title">100%</button>
+    </div>
+    <!-- 影片/時間軸 分隔線：按住上下拖曳調整兩者比例 -->
+    <div id="splitter" title="按住上下拖曳，調整影片 / 時間軸的高度比例" data-i18n-title="app.splitter_title"></div>
+    <!-- 時段標註中：起訖資訊 + 確認/取消（Enter / Esc）-->
+    <div id="tmpBar" class="hidden">
+      <span class="rec-dot">⏺</span>
+      <span id="tmpInfo"></span>
+      <span class="dim" data-i18n="app.tmp_extend">播放影片或點時間軸延伸</span>
+      <span class="spacer"></span>
+      <button id="tmpOk" class="primary" data-i18n="app.tmp_ok">✓ 確認（Enter）</button>
+      <button id="tmpCancel" data-i18n="app.tmp_cancel">✕ 取消（Esc）</button>
+    </div>
+    <!-- 多選批次操作列（Shift+左鍵 / gutter ☑ 全選）-->
+    <div id="batchBar" class="hidden">
+      <span><span data-i18n="app.batch_selected_1">☑ 已選</span> <b id="batchCount">0</b> <span data-i18n="app.batch_selected_2">個標註</span></span>
+      <span class="spacer"></span>
+      <button id="batchLabel" data-i18n="app.batch_label">🏷 改類別…</button>
+      <button id="batchDel" class="danger" data-i18n="app.batch_del">🗑 批次刪除（Del）</button>
+      <button id="batchClear" data-i18n="app.batch_clear">✕ 清除選取（Esc）</button>
+    </div>
+    <div id="timelineWrap"><canvas id="timeline"></canvas></div>
+  </section>
+
+  <!-- 右：工具列 icon（Roboflow 式，工具優先）-->
+  <nav id="tools"></nav>
+
+  <!-- 最右：layers（本 frame 標註）+ 選取詳情 -->
+  <aside id="rightPanel">
+    <div id="layersBox" class="panel">
+      <h3><span data-i18n="app.layers">標註</span> <span id="layersCount" class="dim"></span></h3>
+      <div id="layersList"></div>
+    </div>
+    <div id="detailBox" class="panel hidden"></div>
+  </aside>
+</main>
+
+<!-- ===== 浮動標註編輯（時間軸雙擊：改類別/起訖，與影片同步）===== -->
+<div id="editPop" class="hidden"></div>
+
+<!-- ===== 浮動 class selector（先畫後選類別）===== -->
+<div id="classPop" class="hidden">
+  <div class="cp-tabs" id="cpTabs"></div>
+  <input id="cpSearch" placeholder="搜尋或輸入新類別後按 Enter…" data-i18n-ph="app.cp_search_ph">
+  <div id="cpList"></div>
+</div>
+
+<!-- ===== 快捷鍵面板 ===== -->
+<div id="keysOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-head"><h2 data-i18n="app.keys_title">快捷鍵</h2><span class="dim" data-i18n="app.esc_close">Esc 關閉</span>
+      <button class="modal-close" data-close="keysOverlay">✕</button></div>
+    <table class="keys" id="keysTable"></table>
+  </div>
+</div>
+
+<!-- ===== extract（temporal 段 → 每 N 秒生成 event）===== -->
+<div id="extractOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head"><h2 data-i18n="app.extract_title">抽樣生成 event</h2>
+      <button class="modal-close" data-close="extractOverlay">✕</button></div>
+    <div class="modal-pad">
+      <p class="dim" id="extractDesc"></p>
+      <div class="field"><label data-i18n="app.extract_interval">間隔</label>
+        <select id="extractInterval">
+          <option value="5" data-i18n="app.extract_ev5">每 5 秒</option><option value="30" selected data-i18n="app.extract_ev30">每 30 秒</option>
+          <option value="10" data-i18n="app.extract_ev10">每 10 秒</option><option value="60" data-i18n="app.extract_ev60">每 60 秒</option>
+        </select></div>
+      <div class="field"><label data-i18n="app.extract_event">event</label><select id="extractLabel"></select></div>
+      <div class="field dim" id="extractPreview"></div>
+      <div class="field"><button id="extractGo" class="primary" data-i18n="app.extract_go">生成</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+<script src="app.js?v=20261102-1"></script>
+</body>
+</html>

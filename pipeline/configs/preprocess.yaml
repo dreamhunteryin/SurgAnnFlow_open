@@ -1,0 +1,80 @@
+# 上傳前處理 pipeline 參數（R5：所有閾值集中此處，勿 hard-code）。
+# 流程：合併 → OOB 推論 → 切除+標準化（單一 pass）→ 驗證。
+
+merge:
+  ratio_threshold: 0.98    # 合併輸出/輸入 duration 比低於此值 → 視為 silent truncation，
+                           # 自動 fallback 逐段 re-encode 後再 concat（實測教訓：部分來源檔 concat 會無聲截斷）
+  extensions: [.mp4, .mov, .avi, .mpg, .mpeg, .mkv]   # 掃描病人資料夾時認定的影片副檔名（不分大小寫）
+  fallback_encoder: auto   # 逐段 re-encode fallback 用的編碼器：auto（NVENC 可用即用）| nvenc | libx264
+  fallback_crf: 18         # fallback 中間產物品質（之後還會再最終編碼一次，故取高品質）
+  fallback_cq: 19          # NVENC 對應品質參數
+
+oob:                       # Out-of-body 偵測（去識別化）
+  # 模型：OOBNet（CAMMA, University of Strasbourg）MobileNetV2 + LSTM。
+  # ★ 權重授權 CC BY-NC-SA 4.0 —— 僅限非商業研究使用；平台商業化前必須換模型。
+  # 推論為 ONNX + onnxruntime，在主 venv 內執行（不需要 TensorFlow）。
+  # 模型隨 repo 附帶（pipeline/models/oob/，clone 即有、免下載、可離線安裝；授權與出處見同目錄
+  #   LICENSE-OOBNet.md）。附帶不等於同意：首次使用前須 `surgann fetch-models --only oob`
+  #   閱讀授權並同意（寫入 deploy/.env 的 OOB_LICENSE_ACCEPTED=<ISO 日期>），未同意不跑 OOB。
+  # 模型解析（preprocess.resolve_oob_model）：
+  #   - onnx_path 留空（預設）→ 用 onnx_bundled（相對 pipeline/ 套件目錄）的附帶模型，sha256 必須等於 onnx_sha256
+  #   - onnx_path 有填 → 改用自訂模型（相對 data 根或絕對路徑）；檔案不存在即報錯（不靜默退回附帶模型），
+  #     sha256 與附帶模型不同只警告。要改用自訂模型才填。
+  onnx_path:
+  onnx_bundled: models/oob/oobnet.onnx
+  onnx_sha256: 18d750a657d498bc15ba10d0458584f90f5ca9ec484a2adb515d64c2e7ea8b58
+  onnx_size: 67917157      # bytes（約 67.9 MB）
+  # 出處：由官方 h5 以 pipeline/oob_export_onnx.py 轉出（決定論：同一 h5 重轉得同一 sha256；
+  #   tensorflow-cpu 2.21.0 / tf2onnx 1.17.0 / onnx 1.23.2，opset 17；輸入 frames[1,T,64,64,3]、
+  #   輸出 oob_prob[1,T,1]）。只有要重產 ONNX 時才需要 h5。
+  source_h5_url: https://s3.unistra.fr/camma_public/github/oobnet_detection/ckpt/oobnet_weights.h5
+  source_h5_sha256: 4a39a919938c3ab3dca8a1504da6c9e7ea89d866989a70bd970987c44b267e5b   # 68308624 bytes
+  device: auto             # auto（onnxruntime 有 CUDA 就用 GPU、失敗或無卡改 CPU）| cuda | cpu
+  threads: 4               # CPU 推論 intra-op 執行緒上限（0＝全核）；保留 CPU 給標註服務
+  gpu_mem_limit_mb: 2048   # GPU 推論顯存上限（0＝不限）。整段序列一次推論、與 SAM 同卡同程序 →
+                           # 設上限保護 SAM；超過即自動改 CPU（CPU 推論本身很快：30 分鐘影片 ≈7 秒，
+                           # 瓶頸在解碼，2026-11-02 實測）
+  sample_fps: 1            # 取樣頻率（每秒抽幾幀推論；Endoshare 實證 1 fps 足夠，OOB 段皆數秒以上）
+  threshold: 0.7           # OOB 機率 >= 此值視為體外幀
+                           # 2026-07-17 首批實測 0.5 誤判 5/6 段（臨界猶豫 0.5-0.88），真體外段中位 1.00
+                           # → 升 0.7 砍臨界誤判；QC 關卡仍為漏判安全網
+  min_segment_sec: 2.0     # 短於此秒數的 in-body 段視為雜訊丟棄
+  boundary_pad_sec: 1.0    # 切除段往外各擴此秒數（寧可多切，隱私優先）
+
+encode:                    # 最終標準化編碼（單一 pass：切除 OOB + 720p/25 CFR + 去識別）
+  # auto：偵測到 h264_nvenc 可用就用 NVENC（畫質參數見下），否則自動改 libx264，
+  # 讓無 NVIDIA 卡的機器也能入庫；偵測與 merge.fallback_encoder 共用同一函式。
+  # NVENC 為有卡時的預設方案 —— 2026-07-17 實測：高雜訊內視鏡素材同容量畫質與
+  # x264 slow 持平（SSIM 0.957 vs 0.963）、12–25× 實時、CPU 全留給標註服務；
+  # 8M 碼率上限保護串流頻寬（3 人 ≈30Mbps）與磁碟（200 支 ≈1.44TB）。
+  encoder: auto            # auto | nvenc（強制，無卡即失敗）| libx264
+  height: 720
+  fps: 25
+  gop: 25                  # keyframe 間隔 = fps → 每秒一個 keyframe（與 ingest.yaml target 一致）
+  pix_fmt: yuv420p
+  x264:                    # 備用（低雜訊素材理論畫質略優；2h 影片約 6.6h）
+    crf: 20
+    preset: slow
+    threads: 4             # 上限 CPU 執行緒，保留資源給標註服務（實測 0.30× 實時、佔 ~3 核）
+  nvenc:
+    preset: p5
+    cq: 22
+    maxrate: 8M            # 碼率硬上限；極高雜訊片段以此為準
+    bufsize: 16M
+    multipass: fullres
+
+verify:
+  duration_tolerance_pct: 0.5   # 輸出 duration vs in-body 段總長 容許誤差（%）
+  # CFR / 解析度 / 幀數檢查重用 ingest.yaml 的 verify 區塊（R4，勿在此複製）
+
+jobs:                      # pipeline_jobs 單 worker 佇列（pipeline/jobs.py）
+  poll_interval_sec: 2     # worker 掃佇列的輪詢間隔（秒）
+  progress_db_min_interval_sec: 1   # stage 內進度落 DB 節流：距上次寫入 ≥此秒數
+  progress_db_min_delta_pct: 1      # …或進度增量 ≥此百分比，其一達標才寫 DB
+                                    # （merge / oob / cut_encode 三 stage 共用）
+  stage_weights:           # 各 stage 佔全程進度（0–100）的權重，合計 100
+    merge: 10
+    oob: 30
+    cut_encode: 45
+    verify: 5
+    register: 10

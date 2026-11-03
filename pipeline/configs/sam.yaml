@@ -1,0 +1,71 @@
+# SAM 輔助標註設定（全後端推論；支援 SAM / SAM2，GPU 或 CPU）
+# 設計：後端以 onnxruntime 跑 SAM/SAM2 ONNX（encoder 每幀一次並快取 embedding，decoder 每次點擊）。
+#
+# 模型來源（現成 ONNX，samexporter 轉檔格式；R8：data/ 不進 git）：
+#   SAM2 兩個 tag 可用 `surgann fetch-models --only sam` 自動下載＋驗 sha256（讀下方 zoo.<tag>.sources）；
+#   mobile_sam 上游只有 zip 包，不支援自動下載，需依下列說明手動解壓到 model.dir。
+#   SAM1: https://huggingface.co/vietanhdev/segment-anything-onnx-models
+#     檔案 mobile_sam_20230629.zip（Apache-2.0），解出：
+#     mobile_sam.encoder.onnx       20deef402855b31222b528f52b04807e41ebe47216ac0e39a0729f43491a0209
+#     sam_vit_h_4b8939.decoder.onnx 22cf85e35d14182f4b4712364264c06b22edbef63f065189586f080ef4e2f325
+#     （decoder 檔名沿用上游；SAM1 各變體 decoder 介面相同）
+#   SAM2: https://huggingface.co/vietanhdev/segment-anything-2-onnx-models
+#     sam2_hiera_small.encoder.onnx     f6a7c74dee5b2e71cce3f0475b778f0f28fa3e6c3646c79027302123d2197f40
+#     sam2_hiera_small.decoder.onnx     e07f799d2afe8640ef21f47096ad154d9289bb53041191499ebbea8933ef047b
+#     sam2_hiera_base_plus.encoder.onnx 53b79cec15f2078b3c7410f00f00950a09ef02007dccf238859fec156e42cc8d
+#     sam2_hiera_base_plus.decoder.onnx 666f00ce2664de31211a71068b6b74c3fc5aeee089ebeb2fc9c37834b9ce03b4
+
+model:
+  active: sam2_hiera_base_plus   # ← 一鍵切換（zoo 內任一 tag）
+  dir: models/sam                # 相對 data 根（config.DATA_DIR，可由 SURGANN_DATA_DIR 搬走）；絕對路徑原樣
+  zoo:
+    mobile_sam:                  # 保留供回退比較（品質不佳，使用者已否決）
+      family: sam1
+      encoder: mobile_sam.encoder.onnx
+      decoder: sam_vit_h_4b8939.decoder.onnx
+      name: MobileSAM (ViT-Tiny)
+      # 無 sources：上游只有 zip，不支援 fetch-models 自動下載
+    sam2_hiera_small:
+      family: sam2
+      encoder: sam2_hiera_small.encoder.onnx
+      decoder: sam2_hiera_small.decoder.onnx
+      name: SAM2 hiera-small
+      sources:                   # fetch-models 下載來源（sha256＝HF LFS oid，2026-11-02 核對）
+        encoder: {url: https://huggingface.co/vietanhdev/segment-anything-2-onnx-models/resolve/main/sam2_hiera_small.encoder.onnx, sha256: f6a7c74dee5b2e71cce3f0475b778f0f28fa3e6c3646c79027302123d2197f40, size: 162703493}
+        decoder: {url: https://huggingface.co/vietanhdev/segment-anything-2-onnx-models/resolve/main/sam2_hiera_small.decoder.onnx, sha256: e07f799d2afe8640ef21f47096ad154d9289bb53041191499ebbea8933ef047b, size: 20640886}
+    sam2_hiera_base_plus:
+      family: sam2
+      encoder: sam2_hiera_base_plus.encoder.onnx
+      decoder: sam2_hiera_base_plus.decoder.onnx
+      name: SAM2 hiera-base-plus
+      sources:
+        encoder: {url: https://huggingface.co/vietanhdev/segment-anything-2-onnx-models/resolve/main/sam2_hiera_base_plus.encoder.onnx, sha256: 53b79cec15f2078b3c7410f00f00950a09ef02007dccf238859fec156e42cc8d, size: 339781223}
+        decoder: {url: https://huggingface.co/vietanhdev/segment-anything-2-onnx-models/resolve/main/sam2_hiera_base_plus.decoder.onnx, sha256: 666f00ce2664de31211a71068b6b74c3fc5aeee089ebeb2fc9c37834b9ce03b4, size: 20640886}
+
+runtime:
+  # auto（預設）：onnxruntime 帶 CUDA provider 就用 cuda，否則 cpu；cuda 建 session 或執行失敗
+  #   自動降級 cpu 並記錄於 status()["detail"]。也可明示 cuda / cpu。
+  # cuda：1080 Ti（Pascal sm_61）實測可用，但版本組合固定死（見 deploy/requirements-gpu.txt）：
+  #   onnxruntime-gpu==1.22.0 + nvidia CUDA 12.2 世代 wheels + cuDNN 9.1。
+  #   ORT 1.27 GPU wheel 連結 CUDA 13（Pascal 已移除）不可用；
+  #   cuDNN 9.25 需要 driver 535 沒有的新 API，亦不可用。
+  # cpu：任何環境皆可跑（SAM2 CPU 首擊秒級，體驗差；安裝見 deploy/requirements-cpu.txt）。
+  device: auto
+  encoder_long_side: 1024        # SAM 標準輸入邊長（sam1 長邊；sam2 正方形）
+  multimask_strategy: best_iou   # SAM2 三張候選 mask 的選擇：best_iou / largest
+  warmup: true                   # 啟動時跑一次假圖（吃掉 GPU autotune 首推延遲）
+
+cache:
+  # embedding 快取：記憶體 LRU + 磁碟 LRU
+  # 磁碟路徑 {model_tag}/{video_id}/f{frame:07d}.npz（fp16；sam1 約 2MB/幀、sam2 約 8.4MB/幀）
+  mem_frames: 8                  # 記憶體 LRU 保留幀數（sam2 fp32 約 29MB/幀）
+  disk_dir: cache/sam_emb        # 相對 data 根；絕對路徑原樣
+  disk_limit_gb: 20              # 磁碟總量上限（跨所有 model tag），超過刪最舊（mtime）
+
+polygon:
+  # mask → polygon
+  mask_threshold: 0.0   # logits 二值化門檻
+  epsilon_px: 2.0       # cv2.approxPolyDP 簡化強度（原始解析度 px）
+  min_vertices: 15      # 目標頂點數下限（低於則自動調小 epsilon）
+  max_vertices: 60      # 目標頂點數上限（高於則自動調大 epsilon）
+  max_vertices_hard: 150  # 硬上限（含滑桿手動模式；超過自動加大 epsilon 直到符合）

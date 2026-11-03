@@ -1,0 +1,30 @@
+# === 資料與產出（影片、抽幀、匯出、模型都在 data 根，不進版控）===
+/data/
+/backups/
+/registry/*.db
+/registry/*.db-journal
+/registry/*.db-wal
+/registry/*.db-shm
+
+# === 機密與本機設定（只存在 deploy/.env）===
+/deploy/.env
+deploy/**/.env
+
+# === 部署：surgann setup --systemd 渲染出的本機 unit（含本機使用者/路徑）===
+/deploy/systemd/generated/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# === OS / 編輯器 ===
+.DS_Store
+*.swp
+.idea/
+.vscode/

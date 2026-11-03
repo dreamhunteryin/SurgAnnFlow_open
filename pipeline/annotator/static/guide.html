@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>SurgAnnFlow Annotator 使用手冊</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* 自包含樣式（與平台一致的深色系；本頁可獨立另開，不外連 style.css）*/
+  :root{
+    --bg:#1e2227; --bg2:#262b31; --bg3:#2e343b;
+    --fg:#dde3e9; --dim:#8a949e; --line:#3a424b;
+    --accent:#ff8c00; --sel:#4da3ff; --rec:#ff5252; --danger:#e05555;
+    --ok:#4ade80;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:15px/1.7 system-ui,"Noto Sans TC",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--sel); text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  code{background:var(--bg3); color:#ffd9a0; padding:1px 6px; border-radius:4px; font-size:.9em}
+  kbd{
+    display:inline-block; background:var(--bg3); border:1px solid var(--line);
+    border-bottom-width:2px; border-radius:5px; padding:1px 7px; font-size:.85em;
+    color:#fff; white-space:nowrap;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+  /* 頂欄 */
+  header{
+    position:sticky; top:0; z-index:5; background:#181c20ee; backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  header .wrap{display:flex; align-items:center; gap:14px; height:56px}
+  .brand{font-weight:700; letter-spacing:.5px; color:var(--accent); font-size:18px}
+  .brand span{color:var(--fg); font-weight:400; font-size:14px}
+  header .spacer{flex:1}
+  header a.back{
+    background:var(--bg3); border:1px solid var(--line); color:var(--fg);
+    padding:5px 12px; border-radius:6px; font-size:13px;
+  }
+  header a.back:hover{background:var(--accent); color:#10131a; text-decoration:none}
+
+  /* Hero */
+  .hero{padding:36px 0 8px}
+  .hero h1{margin:0 0 8px; font-size:28px}
+  .hero p{margin:0; color:var(--dim); max-width:760px}
+
+  /* 目錄 */
+  nav.toc{
+    background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:18px 22px; margin:26px 0 10px;
+  }
+  nav.toc h2{margin:0 0 12px; font-size:14px; color:var(--dim); text-transform:uppercase; letter-spacing:1px}
+  nav.toc ol{margin:0; padding:0; list-style:none; columns:2; column-gap:32px}
+  nav.toc li{margin:0 0 7px; break-inside:avoid}
+  nav.toc a{display:inline-block}
+  nav.toc .num{
+    display:inline-block; width:22px; height:22px; line-height:22px; text-align:center;
+    background:var(--bg3); border-radius:6px; color:var(--accent); font-size:12px;
+    margin-right:8px; font-weight:600;
+  }
+
+  /* 章節 */
+  section{padding:30px 0; border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+  h2.sec{font-size:22px; margin:0 0 6px; scroll-margin-top:70px}
+  h2.sec .num{
+    display:inline-block; min-width:30px; height:30px; line-height:30px; text-align:center;
+    background:var(--accent); color:#10131a; border-radius:8px; font-size:15px;
+    margin-right:12px; font-weight:700; vertical-align:2px;
+  }
+  h3{font-size:16px; margin:22px 0 6px; color:#fff}
+  p{margin:8px 0}
+  ul,ol.steps{margin:8px 0; padding-left:22px}
+  li{margin:5px 0}
+
+  /* 白話小盒 */
+  .note{
+    background:#20303a; border-left:4px solid var(--sel); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#cfe6f5;
+  }
+  .note b{color:#fff}
+  .warn{
+    background:#3a2a20; border-left:4px solid var(--accent); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#f5e2cf;
+  }
+  .tip{
+    background:#213026; border-left:4px solid var(--ok); border-radius:0 8px 8px 0;
+    padding:10px 16px; margin:14px 0; color:#d3f0dd;
+  }
+
+  /* pre / 指令 */
+  pre{
+    background:#14171b; border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; overflow-x:auto; margin:12px 0;
+  }
+  pre code{background:none; color:#c7f0d8; padding:0; font-size:13px}
+
+  /* 表格 */
+  .tbl-wrap{overflow-x:auto; margin:14px 0}
+  table{border-collapse:collapse; width:100%; font-size:14px}
+  th,td{border:1px solid var(--line); padding:7px 12px; text-align:left; vertical-align:top}
+  th{background:var(--bg3); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:var(--bg2)}
+  td kbd{font-size:.82em}
+
+  /* icon 說明格 */
+  .icon-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin:14px 0}
+  .icon-cell{background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:10px 12px}
+  .icon-cell .glyph{font-size:20px; color:var(--accent)}
+  .icon-cell .cap{font-size:13px; color:var(--dim); margin-top:2px}
+
+  /* UI 分區示意（三欄：中間影片 / 工具列 / layers+詳情） */
+  .layout-map{
+    display:grid; grid-template-columns:1fr 72px 220px; grid-template-rows:auto 1fr auto;
+    gap:6px; margin:16px 0; min-height:230px; font-size:12px;
+  }
+  .lm{background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:8px; color:var(--dim)}
+  .lm b{color:var(--fg); font-size:13px}
+  .lm.top{grid-column:1/4; text-align:center; background:#181c20}
+  .lm.bottom{grid-column:1/2; background:#181c20}
+  .lm.center{color:#fff; display:flex; align-items:center; justify-content:center; background:#000}
+  .lm.tall{grid-row:2/4}
+
+  footer{padding:40px 0 60px; color:var(--dim); font-size:13px; text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="brand">SurgAnnFlow <span>使用手冊</span></span>
+    <span class="spacer"></span>
+    <a class="back" href="index.html">← 回專案列表</a>
+    <a class="back" href="app.html">標註頁</a>
+    <a class="back" href="guide_en.html" id="langToggle" title="Switch to English">EN</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>SurgAnnFlow Annotator 使用手冊</h1>
+    <p>這是手術影片標註平台的操作說明。你不需要任何前端或伺服器背景，照著每一節一步步做即可。
+       介面採 <strong>Roboflow 式</strong>設計：<strong>先選工具、先畫形狀，畫完再選類別</strong>。
+       時間軸上的區段標註（temporal）與畫面上的框選標註（spatial）在<strong>同一個網頁</strong>完成，
+       影片以<strong>專案（project）</strong>分庫管理，標完可直接從網頁匯出資料集。</p>
+  </div>
+
+  <nav class="toc">
+    <h2>目錄</h2>
+    <ol>
+      <li><a href="#s1"><span class="num">1</span>平台總覽（專案→影片→標註→匯出）</a></li>
+      <li><a href="#s2"><span class="num">2</span>影片庫與專案</a></li>
+      <li><a href="#s3"><span class="num">3</span>進入標註頁</a></li>
+      <li><a href="#s4"><span class="num">4</span>介面導覽</a></li>
+      <li><a href="#s5"><span class="num">5</span>核心工作流：先畫，後選類別</a></li>
+      <li><a href="#s6"><span class="num">6</span>Temporal 標註（時間區段）</a></li>
+      <li><a href="#s7"><span class="num">7</span>Spatial 標註（畫面框選）</a></li>
+      <li><a href="#s8"><span class="num">8</span>時間軸與 layers 面板</a></li>
+      <li><a href="#s9"><span class="num">9</span>抽樣生成 event</a></li>
+      <li><a href="#s10"><span class="num">10</span>標籤（label）管理</a></li>
+      <li><a href="#s11"><span class="num">11</span>完整快捷鍵表</a></li>
+      <li><a href="#s12"><span class="num">12</span>匯出資料集</a></li>
+      <li><a href="#s13"><span class="num">13</span>常見問題</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 ============================================================= -->
+  <section id="s1">
+    <h2 class="sec"><span class="num">1</span>平台總覽（專案→影片→標註→匯出）</h2>
+    <p>整個平台的使用流程只有四步：</p>
+    <ol class="steps">
+      <li><b>專案（project）</b>：先建立或選擇一個專案。每個專案有自己的<strong>類別清單（taxonomy）</strong>與自己的影片。</li>
+      <li><b>影片</b>：把原始影片「入庫（ingest）」到專案——系統會轉成標準化 25fps 影片並登記。</li>
+      <li><b>標註</b>：點影片卡片進入標註頁，用工具畫 temporal 區段與 spatial 形狀。</li>
+      <li><b>匯出</b>：在專案頁「下載資料集」一鍵匯出，或由管理者用 <code>surgann</code> 指令轉成訓練用格式。</li>
+    </ol>
+
+    <p>標註本身分兩種，同一個介面完成：</p>
+    <ul>
+      <li><b>Temporal（時序）標註</b>：在<strong>時間軸</strong>上畫「一段時間」。
+        例如「第 3 分 20 秒到第 5 分是 <code>Calot_triangle_dissection</code> 這個階段」。</li>
+      <li><b>Spatial（空間）標註</b>：在<strong>影片畫面</strong>上框出物件。
+        例如「這一格畫面裡，這個框是 <code>gallbladder</code>（膽囊）」。</li>
+    </ul>
+
+    <div class="note">
+      <b>名詞小解釋</b><br>
+      • <b>專案（project）</b>：像 Roboflow 一樣，一個專案 = 一個標註任務（例如「膽囊切除 phase 標註」），有自己的影片與類別清單。<br>
+      • <b>frame（幀）</b>：影片的一格畫面。本平台影片一律轉成固定每秒 25 格，「第幾格」對「第幾秒」是死板的一對一（<code>秒 = frame ÷ 25</code>），標註位置才會精準。<br>
+      • <b>registry（登錄簿）</b>：一個資料庫檔（<code>registry/registry.db</code>），是平台的<strong>單一事實來源</strong>。專案、影片、類別、標註全都存在裡面；你在網頁上的每個動作都即時寫入——網頁只是「工作桌」，真正的資料資產在 registry 裡。
+    </div>
+
+    <h3>兩個角色</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>元件</th><th>負責</th><th>何時用</th></tr>
+      <tr><td><b>SurgAnnFlow Annotator</b></td><td>專案/影片管理 + temporal + spatial 標註（含 ✨ SAM 智慧輔助）+ 匯出下載（同一個網頁）</td><td>日常標註都在這</td></tr>
+      <tr><td><b>pipeline（<code>surgann</code> 指令）</b></td><td>入庫、抽幀、資料集轉換、備份</td><td>管理者在終端機執行（見第 12 節）</td></tr>
+    </table></div>
+  </section>
+
+  <!-- 2 ============================================================= -->
+  <section id="s2">
+    <h2 class="sec"><span class="num">2</span>影片庫與專案</h2>
+    <p>由架設者先在終端機啟動服務（<code>surgann annotate</code>），然後你在瀏覽器打開網址（預設）：</p>
+    <pre><code>http://127.0.0.1:8090</code></pre>
+
+    <h3>Landing 頁：專案卡</h3>
+    <p>打開網址後看到的是<strong>專案列表</strong>。每個專案是一張卡片，顯示：專案名稱、類型徽章
+      （<code>temporal</code> / <code>spatial</code> / <code>mixed</code>）、annotation group（這個專案在標什麼）、影片數。</p>
+    <ul>
+      <li><strong>點專案卡</strong> → 進入該專案的專案頁。</li>
+      <li><strong>點「＋ 建立專案」</strong> → 彈出建立視窗，填三個欄位：
+        <b>專案名稱</b>（如 Cholecystectomy Phases）、
+        <b>類型</b>（temporal＝只標時間軸 / spatial＝只標畫面 / mixed＝兩者皆有，預設 mixed）、
+        <b>Annotation group</b>（一句話描述在標什麼，如 surgical phases）。
+        另可選「<b>複製既有專案的類別</b>」——把來源專案的全部類別（含 triplet 三選單）帶進新專案，
+        <strong>只複製類別、絕不複製標註</strong>（預設不複製）。按「建立」即完成。</li>
+    </ul>
+
+    <h3>專案頁：四個分頁</h3>
+    <p>專案頁左側有四個分頁（標題列並顯示<strong>專案編碼</strong>——固定識別碼，匯出與 CLI 以此指定專案）：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>分頁</th><th>內容</th></tr>
+      <tr><td><b>🎬 影片</b></td>
+        <td>此專案的影片清單。每張卡片：縮圖、影片編號、系列徽章、狀態徽章、長度／解析度／fps、
+            <strong>本專案</strong>的標註筆數。<strong>點卡片進入標註頁</strong>；
+            右上角另有「<b>＋ 加入影片</b>」與卡片上的「<b>移出專案</b>」（見下方說明）。</td></tr>
+      <tr><td><b>📥 上傳資料</b></td>
+        <td><strong>單一影片檔</strong>的快速入庫：掃描伺服器硬碟 <code>data/raw_videos/</code> 的結果表（檔名／大小／video_id／狀態）。
+            檔案先放進該目錄（原始檔<strong>唯讀</strong>、不會被修改），選好「入庫到系列」後按「<b>入庫</b>」
+            即轉成標準化 25fps 影片並加入此專案。<strong>video_id 由系統依系列自動配號</strong>
+            （<code>{系列ID}_{四位數}</code>，如 <code>ABCD_0004</code>），不需手動命名。
+            大檔轉檔需數分鐘，狀態會顯示「⏳ 入庫中…」，完成後影片分頁自動出現新卡片。
+            若檔案<strong>已入庫但還不在本專案</strong>，會顯示「<b>＋ 加入此專案</b>」按鈕——按一下即可，不用重新轉檔。
+            <strong>病人資料夾</strong>（多段錄影需合併＋去識別化）請改用「📥 影片入庫」頁（見下方）。</td></tr>
+      <tr><td><b>🏷 類別</b></td>
+        <td>此專案的 <strong>taxonomy 管理</strong>：phase / action / event / spatial 各層的類別清單，
+            可隨時<strong>新增、改名、改色、刪除</strong>。改名會同步更新既有標註；
+            刪除已被使用的類別會先跳確認（連同其標註一併刪除）。
+            上方另有「<b>從其他專案匯入類別</b>」：把來源專案的類別合併進本專案
+            （同層同名的自動跳過；<strong>不複製標註</strong>）。</td></tr>
+      <tr><td><b>📦 下載資料集</b></td>
+        <td>選匯出格式（MOSaiC / COCO / YOLO / temporal / spatial）→ 按「匯出」→ 完成後出現 <b>⬇ 下載 zip</b> 連結。
+            匯出範圍＝<strong>本專案</strong>。詳見第 12 節。</td></tr>
+    </table></div>
+
+    <h3>把影片加入專案（不會複製影片）</h3>
+    <p>影片只需要<strong>入庫一次</strong>，之後任何專案都可以「引用」它——同一支影片可同時屬於多個專案，
+       而且<strong>每個專案的標註各自獨立</strong>（在 A 專案標的東西，B 專案看不到、也不會被影響）。
+       把影片放進專案有三個入口：</p>
+    <ul>
+      <li><b>＋ 加入影片</b>（🎬 影片分頁右上）：彈出影片庫清單，列出還不在本專案的已入庫影片
+          （附系列與時長），逐支按「加入」即可。</li>
+      <li><b>📚 整系列匯入</b>（同一個彈窗頂部）：選一個系列（如 ABCD）→ 按鈕 → 該系列所有影片一次全部加入
+          （已在專案內的自動略過）。</li>
+      <li><b>📥 上傳資料</b>：未入庫的檔案按「入庫」（轉檔後自動加入本專案）；
+          已入庫的按「＋ 加入此專案」。</li>
+    </ul>
+
+    <h3>把影片移出專案</h3>
+    <p>影片卡片右上角（滑鼠移上去出現）的「<b>移出專案</b>」：把影片從<strong>本專案清單</strong>拿掉，
+       影片本體仍在影片庫、其他專案完全不受影響。若本專案在這支影片已有標註，會先跳出警告
+       「此專案在本片有 N 筆標註，移出將一併刪除」——<strong>確認後這些標註會被刪除</strong>（其他專案的標註不動），
+       請務必看清楚筆數再確認。</p>
+
+    <h3>影片庫與系列（Landing 頁下半部）</h3>
+    <p>Landing 頁專案卡下方是<strong>影片庫</strong>：所有已入庫影片依<strong>系列資料夾</strong>分兩層顯示——
+       第一層列系列卡（名稱、系列 ID、影片數、機構／術式），點進去才列該系列的影片卡
+       （無系列的影片歸入「未分類」資料夾；「← 回系列清單」可回上層）。
+       從影片庫點開影片是<strong>純瀏覽模式</strong>：只有播放器與影片資訊，<strong>不顯示任何標註與標註工具</strong>；
+       頁面右側會列出「所屬專案」，點「✏ 在此專案開啟標註」才進入完整標註模式——標註一律經過專案入口
+       （同一支影片在不同專案的標註互相獨立）。
+       <b>系列（series）</b>是影片入庫時的分群單位（資產層，例如同一批來源或同一種術式），
+       與標註專案互相獨立：系列管影片資產，專案管標註工作。
+       系列在「<b>📥 影片入庫</b>」頁建立與管理（名稱／機構／手術類別可隨時改；四碼系列 ID 由系統產生、不可改），
+       影片編號依系列自動配號（如 <code>ABCD_0001</code>）。
+       同系列的影片可在專案頁用「整系列匯入」一次全部加入。</p>
+
+    <h3>影片入庫頁（病人資料夾批次入庫＋去識別化）</h3>
+    <p>Landing 頁右上「<b>📥 影片入庫</b>」進入。整支手術常被錄影機切成多段檔案放在一個
+       <strong>病人資料夾</strong>裡；這一頁把整個資料夾處理成<strong>一支</strong>去識別化的標準影片，流程五步：</p>
+    <ol class="steps">
+      <li><b>選系列</b>（或先在頁面上方建立新系列），可順帶選「完成後加入某標註專案」。</li>
+      <li><b>提供病人資料夾</b>，兩個入口擇一：
+        <b>伺服器磁碟選取</b>（管理者把資料夾放進 <code>data/raw_videos/_incoming/</code> 後按重新掃描）
+        或 <b>瀏覽器上傳</b>（直接選取本機資料夾，切成 50MB 區塊上傳，斷線可續傳）。</li>
+      <li><b>確認合併順序</b>：系統依檔名排序列出所有檔案，<strong>可拖曳調整順序</strong>後排入處理佇列
+        （順序錯了合併結果無法回復，請比對錄影段落先後；若出現「⚠ mtime 不一致」警告要特別檢查）。</li>
+      <li>系統自動：合併 → 偵測<strong>體外（out-of-body）畫面</strong> → 停在
+        「<b>待 QC 核可</b>」——請點「🔍 QC 核可」檢視建議切除段的縮圖，
+        可微調起訖秒數、刪除誤判段或新增漏抓段，<strong>核可後</strong>才會切除並轉檔。
+        每段旁的信心徽章：<b>● 高信心</b>（綠，體外機率中位數 ≥ 0.9）大多可信；
+        <b>▲ 存疑</b>（黃，&lt; 0.9）＝模型不太確定，請優先檢查這些段的縮圖是否誤判。
+        誤留體外畫面＝隱私事故，寧可多切。</li>
+      <li>完成後影片自動入庫（依系列配號）、加入所選專案；原始資料夾移到
+        <code>archived/</code> 保存（不刪除），頁面下方顯示可清理空間供管理者參考。</li>
+    </ol>
+    <p class="dim">處理佇列一次跑一夾，伺服器重啟會自動續跑；失敗的 job 可「重試」或「刪除」（刪除時可選擇連同暫存檔一併清掉）。</p>
+
+    <div class="warn"><b>影片沒出現在專案裡？</b> 先確認影片已<strong>入庫</strong>，再用上面任一入口把它加入本專案。
+      若「📥 上傳資料」的掃描表裡沒有該檔案，請先請管理者把影片放到伺服器的
+      <code>data/raw_videos/</code>（見第 13 節）。</div>
+    <div class="tip">建議先把影片<strong>從頭到尾看過一遍</strong>再開始標，對整體流程有概念後效率更高。</div>
+  </section>
+
+  <!-- 3 ============================================================= -->
+  <section id="s3">
+    <h2 class="sec"><span class="num">3</span>進入標註頁</h2>
+    <ol class="steps">
+      <li>Landing 頁 → 點<strong>專案卡</strong>。</li>
+      <li>專案頁「🎬 影片」→ 點<strong>影片卡片</strong>（等同開啟 <code>app.html?v=ABCD_0001</code>）。</li>
+      <li>標註頁載入後，可用的<strong>類別清單就是這個專案的 taxonomy</strong>（每個專案各自獨立）。</li>
+    </ol>
+    <p>在標註頁的頂欄：</p>
+    <ul>
+      <li><b>📁 影片庫</b>：回到專案頁換影片／換專案。</li>
+      <li><b>☰ 選單</b>：內含「📖 使用手冊（新分頁，就是本頁）」與「⌨ 快捷鍵清單」。</li>
+      <li>中間顯示<strong>目前影片編號</strong>與<strong>專案徽章</strong>（標註只記在這個專案底下）。</li>
+      <li>右側是<strong>標註者選擇器</strong>（見下方）。</li>
+    </ul>
+
+    <h3>選擇標註者（開工前先確認！）</h3>
+    <p>頂欄右側的「標註者」下拉選單決定<strong>接下來的每一筆標註記在誰名下</strong>。
+       開始標之前先確認選的是自己：</p>
+    <ol class="steps">
+      <li>點開下拉選單，選自己的名字。</li>
+      <li>名單裡沒有你？選「<b>＋ 新增標註者…</b>」→ 輸入名字（如：王醫師）→ 確定，系統會把你加進名冊並自動選取。</li>
+      <li>選一次就會被瀏覽器記住，下次打開自動帶入；中途換人標，記得先換這裡。</li>
+    </ol>
+    <div class="tip">同一支影片、同一個專案可以有多位標註者的標註並存；匯出時每筆標註都帶著標註者資訊，之後可以分開統計或比對。</div>
+  </section>
+
+  <!-- 4 ============================================================= -->
+  <section id="s4">
+    <h2 class="sec"><span class="num">4</span>介面導覽</h2>
+    <p>標註頁是乾淨的三欄版面：</p>
+
+    <div class="layout-map">
+      <div class="lm top"><b>頂欄</b>：SurgAnnFlow ・ 📁影片庫 ・ ☰選單 ・ 目前影片 ・ 標註者</div>
+      <div class="lm center">中間：影片畫面<br>（spatial 直接畫在這上面）</div>
+      <div class="lm"><b>工具列</b><br>⬚ 選取<br>⏱ 時段<br>──<br>▭ 框<br>⬠ 多邊<br>• 點<br>⬭ 橢圓<br>〰 折線<br>──<br>✨ 智慧</div>
+      <div class="lm tall"><b>最右面板</b><br><br><b>標註（layers）</b><br>目前 frame 的標註<br>層→類別分組<br>👁 分層隱藏 ・ 🗑 刪除<br><br><b>選取詳情</b><br>Start/End・插值<br>keypoints・triplet<br>抽樣・刪除</div>
+      <div class="lm bottom"><b>底部（中欄下方）</b>：播放控制列（transport）＋ 時間軸（timeline）</div>
+    </div>
+
+    <h3>中間：影片 + overlay</h3>
+    <p>播放區。spatial 形狀直接畫在影片上（overlay）。可用 <kbd>Ctrl</kbd>+滾輪縮放影片、雙擊還原（見第 7 節）。</p>
+
+    <h3>右側：工具列（Roboflow 式，工具優先）</h3>
+    <p>一排直立 icon，<strong>先選工具再動手</strong>。由上而下：</p>
+    <div class="icon-grid">
+      <div class="icon-cell"><span class="glyph">⬚</span><div>選取</div><div class="cap">點選標註（<kbd>V</kbd>）；選取後按 <kbd>E</kbd> 編輯</div></div>
+      <div class="icon-cell"><span class="glyph">⏱</span><div>時段</div><div class="cap">開始時段標註（<kbd>T</kbd>，單次性）</div></div>
+      <div class="icon-cell"><span class="glyph">▭</span><div>框</div><div class="cap">bbox（<kbd>B</kbd>）</div></div>
+      <div class="icon-cell"><span class="glyph">⬠</span><div>多邊</div><div class="cap">polygon（<kbd>P</kbd>）</div></div>
+      <div class="icon-cell"><span class="glyph">•</span><div>點</div><div class="cap">point（<kbd>O</kbd>）</div></div>
+      <div class="icon-cell"><span class="glyph">⬭</span><div>橢圓</div><div class="cap">ellipse（<kbd>E</kbd>）</div></div>
+      <div class="icon-cell"><span class="glyph">〰</span><div>折線</div><div class="cap">polyline（<kbd>L</kbd>）</div></div>
+      <div class="icon-cell"><span class="glyph">✨</span><div>智慧</div><div class="cap">SAM 輔助（<kbd>S</kbd>）：點一下自動生成 polygon</div></div>
+    </div>
+
+    <h3>最右：layers 面板 + 選取詳情</h3>
+    <ul>
+      <li><b>標註（layers）</b>：只列<strong>目前播放頭 frame 底下</strong>的標註，依層（phase / action / event / triplet / spatial）
+        →類別分組列出；類別名後的<strong>括號數字＝該類別在整支影片的標註總數</strong>（如 <code>preparation (3)</code>）。
+        層／shape／類別標頭與每筆各有 <b>👁</b>（分層隱藏，見第 8 節）、每筆另有 <b>🗑</b>（刪除）。
+        <strong>點某筆</strong>會選取它並跳到它的起點；<kbd>Shift</kbd>+點＝加入多選。</li>
+      <li><b>選取詳情</b>：選取一筆標註後出現。可改 Start / End（旁邊的 <b>⌖</b> = 設為目前 frame）、
+        triplet 三選單、spatial 的插值開關與 keypoint 清單、抽樣生成 event、跳到起點／隱藏／刪除。詳見第 8 節。</li>
+    </ul>
+
+    <h3>底部：播放控制列（transport）</h3>
+    <ul>
+      <li><b>⏮ ▶ ⏭</b>：回開頭／播放暫停／到結尾；<b>變速</b> 0.2x–5x。</li>
+      <li><b>‹ ›</b>：±1 frame（<kbd>Ctrl+←</kbd>/<kbd>Ctrl+→</kbd>）；<b>frame…</b> 輸入框：直接跳到某格。</li>
+      <li><b>|◀ ▶|</b>：跳上一個／下一個標註的起點（<kbd>←</kbd>/<kbd>→</kbd>）——只在<strong>顯示中</strong>的標註間跳轉，
+        被 👁 隱藏的會跳過（軌道收合不算隱藏）；<b>◆◀ ▶◆</b>：跳上一個／下一個 keypoint（選取 spatial 標註時才出現）。</li>
+      <li><b>時間顯示</b>：點一下在「時間 ↔ frame」顯示間切換。</li>
+      <li><b>縮放鈕（右下，顯示目前級別）</b>：每按一下跳一級，循環
+          <b>100% → 200% → 400% → 800% → frame 級 → 回 100%</b>；<kbd>Ctrl</kbd>+滾輪可自由縮放。</li>
+    </ul>
+  </section>
+
+  <!-- 5 ============================================================= -->
+  <section id="s5">
+    <h2 class="sec"><span class="num">5</span>核心工作流：先畫，後選類別</h2>
+    <p>SurgAnnFlow 採 Roboflow 式流程——<strong>不用先想好類別</strong>，先把東西畫出來，畫完系統才問你「這是什麼」：</p>
+    <ol class="steps">
+      <li><b>選工具</b>：右側工具列點一下，或按快捷鍵（<kbd>B</kbd> 框、<kbd>T</kbd> 時段…）。</li>
+      <li><b>畫</b>：在影片上畫形狀（spatial）；temporal 則是按 <kbd>T</kbd> 記下起點、播放/點時間軸延伸、<kbd>Enter</kbd> 設終點（第 6 節）。</li>
+      <li><b>選類別</b>：畫完，畫面上自動彈出<strong>浮動類別選單</strong>（class popup），
+        列出這個專案的類別（如 <code>gallbladder</code>、<code>hook</code>…）。點一個，或打字搜尋後按 <kbd>Enter</kbd>。</li>
+      <li><b>完成</b>：標註立即存進 registry（右下角出現「已標註 ×××」提示），並自動選取這筆。</li>
+    </ol>
+
+    <h3>浮動類別選單的操作</h3>
+    <ul>
+      <li><b>搜尋框</b>：直接打字過濾；<kbd>↑</kbd>/<kbd>↓</kbd> 移動、<kbd>Enter</kbd> 選定。</li>
+      <li><b>新增類別</b>：打一個不存在的名稱，清單底部會出現「＋ 新增『×××』」，點它（或 <kbd>Enter</kbd>）
+        即把新類別加進<strong>這個專案的 taxonomy</strong> 並直接套用（見第 10 節）。</li>
+      <li><b>上次用的類別</b>會標 <b>↩</b> 記號且<strong>預設反白</strong>——直接按 <kbd>Enter</kbd> 即套用，方便連續標同一種東西。</li>
+      <li><b>temporal 的選單有分頁</b>：phase / action / event / triplet 四個 tab，先切層再選類別（見第 6 節）。</li>
+      <li><kbd>Esc</kbd>：放棄這次繪製（形狀不會存）。</li>
+    </ul>
+
+    <h3><kbd>N</kbd>：自動套用上次類別（連續標同物件的加速器）</h3>
+    <p>按 <kbd>N</kbd> 開啟後，<strong>每畫完一個形狀就直接套用上一次的 spatial 類別</strong>，不再跳類別選單——
+       適合一口氣標幾十個同種物件。再按一次 <kbd>N</kbd> 關閉。</p>
+    <ul>
+      <li>需要先手動標過一個 spatial（有「上次類別」可套用）。</li>
+      <li>開啟時若目前不是繪製工具，會自動切到 <b>▭ 框</b>。</li>
+    </ul>
+    <div class="tip">典型節奏：<kbd>B</kbd> 選框工具 → 畫第一個 → 選 <code>hook</code> → 按 <kbd>N</kbd> →
+      之後每畫一個框都自動是 <code>hook</code> → 標完按 <kbd>N</kbd> 關閉。</div>
+  </section>
+
+  <!-- 6 ============================================================= -->
+  <section id="s6">
+    <h2 class="sec"><span class="num">6</span>Temporal 標註（時間區段）</h2>
+    <p>Temporal 標註是在時間軸上畫「一段」。共有四層，<strong>彼此完全獨立、可同時重疊</strong>：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>層</th><th>意義</th><th>範例</th></tr>
+      <tr><td><code>phase</code></td><td>手術階段</td><td>Preparation、Calot_triangle_dissection…</td></tr>
+      <tr><td><code>action</code></td><td>動作 / 動詞</td><td>grasp、dissect、clip…</td></tr>
+      <tr><td><code>event</code></td><td>點狀或短區段事件</td><td>bleeding、CVS_achieved…</td></tr>
+      <tr><td><code>triplet</code></td><td>一段區間掛上（器械, 動作, 目標）三元組</td><td>grasper + dissect + cystic_duct</td></tr>
+    </table></div>
+
+    <h3>標一段 temporal（邊看邊標）</h3>
+    <ol class="steps">
+      <li><b>先對好起點</b>：暫停影片，或點時間軸跳到目標 frame。</li>
+      <li>按 <kbd>T</kbd> 或點工具列的 <b>⏱ 時段</b>＝<strong>開始標註</strong>，起點就是目前 frame。
+          時間軸上方出現橘色「⏺ 時段標註中」列，顯示目前的起訖與長度。</li>
+      <li>延伸這段的長度，兩種方式可混用：
+        <ul>
+          <li><b>播放影片</b>（<kbd>Space</kbd>）——播放頭走到哪，這段就跟到哪；</li>
+          <li><b>點時間軸</b>某處——這段自動縮放到該時間點（點在起點之前＝把起點往前拉）。</li>
+        </ul></li>
+      <li>按 <kbd>Enter</kbd> 或橘色列上的「✓ 確認」＝<strong>設定終點</strong>，彈出<strong>類別選單</strong>
+          （<b>phase / action / event / triplet</b> 四個分頁），且<strong>預設反白上一次使用的類別</strong>。</li>
+      <li><strong>再按一次 <kbd>Enter</kbd></strong>＝直接以預設類別完成；
+          要換類別就點清單（或打字搜尋 + <kbd>Enter</kbd>）。</li>
+    </ol>
+    <ul>
+      <li><b>「時段」是單次性的</b>：每完成一個標註，⏱ 鈕自動回到非啟用狀態；
+          非標註中點時間軸<strong>只是跳時間</strong>，絕不會產生標註。</li>
+      <li>標註中再按一次 <kbd>T</kbd>（或 ⏱ 鈕）＝取消這段；<kbd>Esc</kbd> 亦可（確認前隨時可按）。</li>
+      <li>分頁會記住你<strong>上一次用的層</strong>，連續標同一層不用重切。</li>
+    </ul>
+    <div class="tip">連續標同一類別的節奏：對好起點 → <kbd>T</kbd> → 播放到終點 → <kbd>Enter</kbd> →
+      <kbd>Enter</kbd>——兩下 Enter 就是一筆。</div>
+
+    <h3>triplet 三選單</h3>
+    <p>在類別選單的 <b>triplet</b> 分頁選定後，選取詳情面板會出現 <b>instrument / verb / target</b> 三個下拉選單，
+       三個都選好即完成一個手術動作三元組。</p>
+
+    <h3>微調與刪除</h3>
+    <ul>
+      <li><b>雙擊區段</b>＝開<strong>編輯彈窗</strong>：可直接改<strong>類別</strong>與<strong>起訖 frame</strong>，
+          改起訖時影片會同步跳到該 frame。</li>
+      <li><b>拖邊緣（要先進編輯模式）</b>：選取區段後按 <kbd>E</kbd> 進入<strong>編輯模式</strong>，
+          才能拖區段的左右邊緣——未進編輯模式時純瀏覽、不會誤拖。拖的時候<strong>影片畫面會跟著跳</strong>，
+          看畫面就知道拉到哪一秒 / 哪一 frame。再按 <kbd>E</kbd> 或改選其他標註即離開編輯模式。</li>
+      <li>極短的區段（如 1 frame）也拖得到：編輯模式下點它的<strong>左半邊拉起點、右半邊拉終點</strong>。</li>
+      <li>在時間軸上<b>點選任一標註</b>，影片會同步跳到該標註的起點。</li>
+      <li>詳情面板的 Start / End 欄位可直接輸入 frame；旁邊的 <b>⌖</b> = 設為目前 frame。</li>
+      <li><b>刪除</b>：選取後按 <kbd>Del</kbd>、編輯彈窗的「刪除」，或 layers 面板的 <b>🗑</b>。</li>
+    </ul>
+    <div class="tip">「事件只有一瞬間」也沒問題——停在該 frame 按 <kbd>T</kbd> 後直接 <kbd>Enter</kbd> 即是 1-frame 標註；
+      需要規律的點狀 event 可用「抽樣生成 event」（第 9 節）。</div>
+  </section>
+
+  <!-- 7 ============================================================= -->
+  <section id="s7">
+    <h2 class="sec"><span class="num">7</span>Spatial 標註（畫面框選）</h2>
+    <p>Spatial 標註是在<strong>影片畫面上</strong>畫形狀框住物件。五種手畫工具＋一個 AI 輔助工具：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>工具</th><th>鍵</th><th>畫法</th></tr>
+      <tr><td><b>▭ 框（bbox）</b></td><td><kbd>B</kbd></td><td>按住拖曳出對角。</td></tr>
+      <tr><td><b>⬠ 多邊形（polygon）</b></td><td><kbd>P</kbd></td><td>逐點點擊，<kbd>Enter</kbd> 或<strong>雙擊</strong>收尾（至少 3 點）。</td></tr>
+      <tr><td><b>• 點（point）</b></td><td><kbd>O</kbd></td><td>點一下即完成。</td></tr>
+      <tr><td><b>⬭ 橢圓（ellipse）</b></td><td><kbd>E</kbd></td><td>按住拖曳出外接框。</td></tr>
+      <tr><td><b>〰 折線（polyline）</b></td><td><kbd>L</kbd></td><td>逐點點擊，<kbd>Enter</kbd> 或雙擊收尾（至少 2 點）。</td></tr>
+      <tr><td><b>✨ 智慧（smart，SAM 輔助）</b></td><td><kbd>S</kbd></td><td>點物件＝正點、按住拖曳＝框提示；
+        AI 即時生成 polygon 預覽（藍色虛線虛影＋信心分數）。修正很直覺：<strong>點在預覽虛影「內」＝自動變負點</strong>
+        （把點擊處從形狀扣掉，紅點）、點在虛影「外」＝正點（綠點）——通常<strong>不需要按 Alt</strong>；
+        <kbd>Alt</kbd>+點＝強制負點（不論點在哪）。可連續加點/重畫框修正，<kbd>Ctrl+Z</kbd> 逐步撤銷上一個點/框；
+        <kbd>Enter</kbd> 或浮條的「<strong>✓ 確認</strong>」鈕＝接受 → 選類別落地為一般 polygon，
+        <kbd>Esc</kbd>／換 frame／換工具＝清除重來。</td></tr>
+    </table></div>
+    <div class="note"><b>✨ 智慧工具備註</b><br>
+      • 需要後端 SAM 模型服務就緒，未就緒時會提示「SAM 模型未就緒」（其他工具不受影響）。<br>
+      • 首次在某 frame 點擊需<strong>短暫等待</strong>（GPU 約 0.5 秒內；無 GPU 需數秒），
+        同 frame 後續修正幾乎即時。<br>
+      • polygon 頂點上限 <strong>150</strong>：即使滑桿拉到最精細，超過時系統自動加大簡化強度收斂到 150 以內
+        （頂點太多會讓之後的逐點編輯很痛苦）。<br>
+      • <strong>精細度滑桿</strong>（畫布左下浮條，smart 工具下出現）：控制 polygon 頂點多寡——越「精細」頂點越多越貼合、
+        越「簡略」頂點越少越好編輯；旁邊即時顯示目前預覽的頂點數。預設「<strong>自動</strong>」（系統調到適中頂點數）；
+        一拖滑桿即改為手動值（會記住，下次沿用），按「自動」鈕可隨時切回。拖動只改簡化程度，已點的正/負點與框都保留。<br>
+      • 落地後就是<strong>一般的 polygon 標註</strong>（單 frame、插值關閉）：可照常編輯頂點、複製、刪除、匯出。</div>
+    <p>畫完 → 彈出類別選單 → 選類別 → 存檔（第 5 節的流程）。繪製中會顯示十字準星輔助對位；<kbd>Esc</kbd> 取消繪製。</p>
+    <div class="tip">點擊<strong>超出影像範圍</strong>也沒關係——系統會自動取影像邊界上最接近滑鼠的點作為頂點
+      （座標貼齊邊界），畫貼邊的 bbox / polygon 不必瞄得剛剛好。</div>
+
+    <h3>keypoint + 線性插值（讓一個框跨多個 frame 移動）</h3>
+    <p>Spatial 標註<strong>有時間跨度</strong>（start/end frame）。你不用每一格都畫，只要在<strong>關鍵 frame</strong> 調整形狀，
+       中間的位置系統會自動內插補上。</p>
+    <ol class="steps">
+      <li>畫好形狀（第一個 keypoint 落在目前 frame）。</li>
+      <li>用 <b>⬚ 選取</b>工具選住它、按 <kbd>E</kbd>（或<strong>左鍵快速連點兩下</strong>該標註）進入編輯模式，播放或跳到後面某個 frame。</li>
+      <li><strong>拖動形狀本體或某個白色頂點把手</strong>——這會在<strong>目前 frame 存一個新的 keypoint</strong>
+        （標註的時間範圍會自動延伸涵蓋這個 frame）。</li>
+      <li>兩個 keypoint 之間的每一格，形狀位置會<strong>線性內插</strong>自動算出來。</li>
+    </ol>
+    <div class="note"><b>插值規則（詳情面板可切「插值」開關）</b><br>
+      • 開啟插值：前後 keypoint 之間、且頂點數相同 → 逐座標線性內插；頂點數不同（多邊形有增減點）→ 沿用前一個 keypoint（hold）；超出兩端 → 取最近端點的形狀。<br>
+      • 關閉插值：只在<strong>有 keypoint 的 frame</strong> 才顯示形狀。</div>
+    <p>選取 spatial 標註後，詳情面板列出所有 keypoint（<b>◆ f123</b>）：點它跳到該 frame、✕ 刪除該 keypoint（至少保留一個）。
+       transport 的 <b>◆◀ / ▶◆</b> 可跳上一／下一個 keypoint；時間軸的 spatial 軌道上也用 ◆ 菱形標出 keypoint 位置。</p>
+
+    <h3>編輯形狀與頂點（選取後按 <kbd>E</kbd>，或左鍵連點兩下標註，進入編輯模式）</h3>
+    <ul>
+      <li><b>先選取、再按 <kbd>E</kbd></b>：未進編輯模式時純瀏覽（點形狀只是選取，不會誤拖）；
+          進入後白色頂點把手才出現、才可拖拉。再按 <kbd>E</kbd>／按 <kbd>Esc</kbd>／改選其他標註即離開。</li>
+      <li><b>移動</b>：拖形狀本體——<strong>碰到影像邊界就停在邊界</strong>，整體移動不會移出畫面。
+          <b>改形</b>：拖白色頂點把手（bbox 四角、橢圓四軸端、多邊形/折線每個頂點）；
+          單一頂點拖出影像時仍照舊<strong>貼齊邊界最近點</strong>。每次拖動＝在目前 frame 存 keypoint。</li>
+      <li><b><kbd>Ctrl</kbd>+點擊</b>（polygon / polyline，編輯模式中）：點在<strong>邊上</strong>插入一個頂點；點在<strong>既有頂點上</strong>刪除該頂點。</li>
+      <li><b><kbd>Alt</kbd>+左鍵拖曳</b>（polygon，編輯模式中）：<strong>沿滑鼠軌跡重繪一段邊緣</strong>——
+          從邊緣附近按住 Alt 拖出想要的新輪廓（粉紅預覽線），放開即把「離軌跡較近的那段舊邊緣」換成你畫的軌跡。
+          軌跡太短或起訖離邊緣太遠（&gt;40px）會提示並不套用。</li>
+      <li><b>快速進入編輯模式</b>：選取工具下，在標註上<strong>滑鼠左鍵快速連點兩下</strong>＝選取並直接進入編輯模式（等同按 <kbd>E</kbd>）。</li>
+      <li>編輯完照常 <kbd>Ctrl+Z</kbd> 可復原（含 Alt+拖曳重繪）。</li>
+    </ul>
+
+    <h3>複製 / 貼上形狀</h3>
+    <ul>
+      <li><kbd>Ctrl+C</kbd>：複製<strong>目前選取</strong>的形狀（以目前 frame 顯示的位置為準）。</li>
+      <li><kbd>Ctrl+Shift+C</kbd>：複製<strong>目前 frame 上所有可見</strong>的形狀。</li>
+      <li><kbd>Ctrl+V</kbd>：貼到目前 frame（類別與位置保留，成為新的獨立標註）。</li>
+      <li>多選（<kbd>Shift</kbd>+左鍵）後的批次複製見第 8 節「多選與批次操作」。</li>
+    </ul>
+
+    <h3>影片縮放（標小物件用）</h3>
+    <ul>
+      <li><kbd>Ctrl</kbd>+滾輪：以游標為中心縮放影片（最大 10 倍）。</li>
+      <li>滾輪 = 垂直捲動、<kbd>Shift</kbd>+滾輪 = 水平捲動——<strong>只在放大（&gt;100%）時有效</strong>，
+        100% 時滾輪不會移動畫面；捲動也不會超出影像邊緣。</li>
+      <li>放大（&gt;100%）時，畫面<strong>下緣／右緣</strong>會出現細細的<strong>捲動 bar</strong>：
+        拖曳 thumb 或點軌道即可左右／上下平移畫面（範圍同樣不會超出影像邊緣）；≤100% 時自動隱藏。</li>
+      <li>在影片區<strong>雙擊</strong>還原縮放（繪製或選取中時不會誤觸還原）。</li>
+    </ul>
+
+    <div class="note"><b>目前的 spatial 工具範圍</b>：框／多邊形／點／橢圓／折線，加上內建的 ✨ SAM 智慧輔助（見本節上方），
+      涵蓋日常標註所需。<strong>像素筆刷 mask</strong> 尚未提供——需要逐像素 segmentation 時，
+      先用多邊形（或 SAM 產生的多邊形）標，匯出 COCO 時可轉為 mask。</div>
+  </section>
+
+  <!-- 8 ============================================================= -->
+  <section id="s8">
+    <h2 class="sec"><span class="num">8</span>時間軸與 layers 面板</h2>
+
+    <h3>時間軸（MOSaiC 式分軌，三層樹狀）</h3>
+    <p>底部時間軸的左側 gutter 是<strong>三層樹狀</strong>結構：</p>
+    <ul>
+      <li><b>第一層</b>：<b>TEMPORAL</b> / <b>SPATIAL</b> 兩個總群組。</li>
+      <li><b>第二層</b>：TEMPORAL 下依層分組（PHASE / ACTION / EVENT / TRIPLET）；
+        SPATIAL 下依<strong>形狀種類</strong>分組（▭ bbox、⬠ polygon、• point、⬭ ellipse、〰 polyline）。</li>
+      <li><b>第三層</b>：<strong>每個已被標註的類別各自一軌</strong>——不同類別絕不混在同一列。</li>
+      <li><b>▸/▾ 收合</b>：前兩層標頭左緣有收起/展開鈕（點標頭列的左半也可）——收起只是<strong>摺疊底下的軌道讓畫面變短</strong>，
+        <strong>不是隱藏標註</strong>（影片上與 layers 面板照常顯示；👁 眼睛鈕行為不變）。</li>
+      <li>同一類別的標註若時間重疊，該軌會自動<strong>堆疊成多條 lane</strong>，不互相蓋住。</li>
+      <li>spatial 軌道上的 <b>◆ 菱形</b> = keypoint 位置。</li>
+      <li>gutter 每列右緣的 <b>👁</b>：分層隱藏（見下）；類別軌另有 <b>☑</b>：全選該類別的所有標註（見「多選與批次操作」）。</li>
+    </ul>
+
+    <h3>分層隱藏（👁）</h3>
+    <p>隱藏有<strong>四個層級</strong>，時間軸 gutter 與最右 layers 面板的眼睛鈕互相呼應、效果相同：</p>
+    <ul>
+      <li><b>整層</b>：群組標頭（PHASE / ACTION / EVENT / TRIPLET / SPATIAL）的 👁 → 一鍵隱藏該層全部標註。</li>
+      <li><b>整個形狀種類</b>（spatial 專用）：形狀子群組（如 ▭ bbox）的 👁 → 隱藏該形狀的全部標註。</li>
+      <li><b>單一類別</b>：類別軌／類別標頭的 👁 → 隱藏該類別的全部標註。</li>
+      <li><b>單一標註</b>：layers 面板每筆的 👁（原有行為）。</li>
+    </ul>
+    <p>隱藏的標註不畫在影片上、時間軸上變淡；只影響顯示，資料不動。再點一次 👁（顯示為 🚫）即恢復。</p>
+
+    <h3>多選與批次操作（Shift+左鍵 / ☑ 全選）</h3>
+    <ul>
+      <li>在<strong>時間軸</strong>或<strong>影片畫面</strong>上 <kbd>Shift</kbd>+左鍵點標註＝加入／移出多選
+        （layers 面板的項目也可 <kbd>Shift</kbd>+點）。多選中的標註以<strong>藍色虛線框</strong>標示。</li>
+      <li><b>☑ 全選類別</b>：時間軸 gutter 類別軌的 👁 旁、以及 layers 面板類別標頭的 <b>☑</b>——
+        一鍵把該類別的<strong>所有標註</strong>加入多選；再按一次取消。可搭配 Shift+點繼續加減選。</li>
+      <li>有多選時，時間軸上方會出現<strong>藍色批次操作列</strong>：顯示已選數量，
+        提供「<b>🏷 改類別…</b>」（批次改 label，僅支援同一層的選取）、「<b>🗑 批次刪除</b>」與「✕ 清除選取」。</li>
+      <li><kbd>Del</kbd>：<strong>批次刪除</strong>多選的標註（跳一次確認）。</li>
+      <li><kbd>Ctrl+C</kbd> → <kbd>Ctrl+V</kbd>：<strong>批次複製</strong>。spatial 複製各標註在目前 frame 的形狀、貼到目前 frame；
+        temporal 以選取中<strong>最早的起點為基準</strong>，貼上時整組平移——最早那筆的起點落在目前 frame，其餘保持相對位置與長度。</li>
+      <li>一般（不按 Shift）點選任何標註會清空多選、回到單選。</li>
+    </ul>
+
+    <h3>縮放、平移、導航</h3>
+    <ul>
+      <li><b>概覽條</b>（最上方細條）：整支影片的標註分佈，橘框是目前檢視窗；點或拖它快速跳位。</li>
+      <li>一般<b>滾輪</b>：時間軸<strong>上下捲動</strong>（軌道多到超出高度時）；
+          <kbd>Shift</kbd>+滾輪：<strong>水平平移</strong>；<kbd>Ctrl</kbd>+滾輪：以游標為中心縮放，
+          一路可放大到<strong>一格一格的 frame 網格</strong>。</li>
+      <li>右下角<b>縮放鈕</b>（顯示目前級別）：每按一下跳一級，100% → 200% → 400% → 800% → frame 級，再按回到 100%。</li>
+      <li>影片與時間軸交界處有一條<b>分隔線</b>（中間有短橫桿）：按住上下拖曳，調整影片 / 時間軸的高度比例。</li>
+      <li>點軌道空白處 = 跳到該時間；游標懸停會顯示該位置的時間（或 frame）。</li>
+      <li>選取區段並按 <kbd>E</kbd> 進入編輯模式後，可<strong>拖左右邊緣</strong>改起訖（spatial 的範圍不能縮進 keypoint 之內）；
+          點選標註時影片會同步跳到其起點。</li>
+    </ul>
+
+    <h3>layers 面板（最右「標註」區）</h3>
+    <ul>
+      <li>只列<strong>目前播放頭 frame 底下</strong>的標註（temporal＝起訖涵蓋目前 frame；spatial＝該 frame 有形狀），
+        播放頭移動時即時更新；標題顯示「本 frame N」。</li>
+      <li>結構：層標頭 →（spatial 再分形狀種類標頭）→ 類別標頭 → 各筆標註。
+        類別標頭顯示顏色點＋類別名＋<strong>括號數字＝該類別在整支影片的標註總數</strong>；
+        各筆顯示時間範圍（temporal）或形狀＋frame 範圍（spatial）。</li>
+      <li><b>👁</b>：各層級標頭與單筆都有——對應上述四級分層隱藏。</li>
+      <li><b>🗑</b>：刪除該筆。</li>
+      <li><b>點某筆</b>：選取並跳到它的起點（spatial 跳到第一個 keypoint）；<kbd>Shift</kbd>+點＝加入多選。</li>
+    </ul>
+
+    <h3>選取詳情面板</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>欄位 / 按鈕</th><th>作用</th></tr>
+      <tr><td>Start / End ＋ <b>⌖</b></td><td>直接輸入起訖 frame；⌖ = 設為目前 frame。</td></tr>
+      <tr><td>instrument / verb / target</td><td>triplet 專用三選單。</td></tr>
+      <tr><td>插值開關 ＋ keypoints 清單</td><td>spatial 專用：切換線性插值；每個 ◆ f123 可點跳、✕ 刪除。</td></tr>
+      <tr><td>抽樣「生成 event…」</td><td>temporal 專用，見第 9 節。</td></tr>
+      <tr><td>跳到起點 / 隱藏 / 刪除</td><td>常用動作。</td></tr>
+    </table></div>
+  </section>
+
+  <!-- 9 ============================================================= -->
+  <section id="s9">
+    <h2 class="sec"><span class="num">9</span>抽樣生成 event</h2>
+    <p>有時你想在「某一段」裡每隔固定秒數放一個 event 標記（例如每 30 秒抽一個點做品質檢查）。不用手動一個個點：</p>
+    <ol class="steps">
+      <li>選取一段 temporal 區段（phase / action / event / triplet 皆可）。</li>
+      <li>在詳情面板點 <b>「生成 event…」</b>。</li>
+      <li>彈出視窗選<strong>間隔</strong>（每 5 / 10 / 30 / 60 秒，預設 30）與要生成的 <b>event 類別</b>。</li>
+      <li>視窗會即時預告「將生成 N 個 event」，確認後按<strong>生成</strong>。</li>
+    </ol>
+    <p>系統會<strong>從這段的起點（含）</strong>開始，每 N 秒生成一個 1-frame 的 event 標註。</p>
+    <div class="warn">若下拉沒有可選的 event 類別，代表這個專案的 taxonomy 還沒有 event
+      → 先隨便用 ⏱ 時段工具標一段、在類別選單的 event 分頁<strong>打字新增</strong>一個 event 類別（第 10 節）。</div>
+  </section>
+
+  <!-- 10 ============================================================= -->
+  <section id="s10">
+    <h2 class="sec"><span class="num">10</span>標籤（label）管理</h2>
+    <p><strong>類別清單（taxonomy）現在存在每個專案的資料庫裡</strong>（registry 的 projects / labels 表），
+       每個專案各自獨立——<strong>不再是改 yaml 檔</strong>。</p>
+
+    <h3>方式 A：在類別選單裡直接新增（日常用這個）</h3>
+    <ol class="steps">
+      <li>照常畫一個形狀或標一段時段 → 彈出類別選單。</li>
+      <li>在搜尋框<strong>打新類別的名字</strong>（如 <code>clip_applier</code>）。</li>
+      <li>清單底部出現「<b>＋ 新增『clip_applier』到 spatial</b>」→ 點它或按 <kbd>Enter</kbd>。</li>
+      <li>新類別立即加入<strong>這個專案</strong>的 taxonomy 並套用到剛畫的標註，之後所有人都選得到。spatial 類別會自動配色。</li>
+    </ol>
+
+    <h3>方式 B：另建專案（taxonomy 大改時）</h3>
+    <p>若要一套<strong>完全不同</strong>的類別（例如換一種手術），直接在 landing 頁<strong>建立新專案</strong>——
+       新專案有自己乾淨的 taxonomy，與舊專案互不影響。</p>
+
+    <div class="note"><b>那 yaml 檔呢？</b> <code>pipeline/configs/labels_*.yaml</code> 現在只作為
+      <b>default 專案的初始種子</b>與 <b>triplet 三選單（instrument/verb/target）的後援清單</b>，
+      日常增修類別都在介面內完成、即時生效、不必重啟。triplet 的三選單內容要調整時請找管理者。</div>
+    <div class="warn">新增類別<strong>無法從介面刪除或改名</strong>（避免既有標註失效）。真的要整理 taxonomy 請找管理者處理資料庫。</div>
+  </section>
+
+  <!-- 11 ============================================================= -->
+  <section id="s11">
+    <h2 class="sec"><span class="num">11</span>完整快捷鍵表</h2>
+    <p>與介面「☰ 選單 → ⌨ 快捷鍵清單」完全一致：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th style="width:230px">按鍵</th><th>功能</th></tr>
+      <tr><td><kbd>V</kbd></td><td>選取工具</td></tr>
+      <tr><td><kbd>T</kbd></td><td>開始時段標註（起點＝目前 frame）；標註中再按＝取消</td></tr>
+      <tr><td><kbd>T</kbd> → <kbd>Enter</kbd></td><td>設定終點 → 類別選單（預設上次類別）→ 再按 <kbd>Enter</kbd> 直接確認</td></tr>
+      <tr><td><kbd>E</kbd></td><td>選取標註後：進入/離開編輯模式（開放拖拉把手與邊界）；無選取時＝橢圓工具</td></tr>
+      <tr><td><kbd>B</kbd> / <kbd>P</kbd> / <kbd>O</kbd> / <kbd>E</kbd> / <kbd>L</kbd></td><td>框 / 多邊形 / 點 / 橢圓 / 折線</td></tr>
+      <tr><td><kbd>S</kbd></td><td>✨ 智慧工具（SAM 輔助）：點=正點、點在預覽內=自動負點、<kbd>Alt</kbd>+點=強制負點、按住拖曳=框提示</td></tr>
+      <tr><td><kbd>S</kbd> → <kbd>Enter</kbd>（或浮條「✓ 確認」鈕）</td><td>接受 SAM 預覽 → 類別選單 → 落地為 polygon；<kbd>Esc</kbd>/換 frame/換工具＝清除提示</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd>（smart 工具）</td><td>逐步撤銷上一個 prompt（點/框）；提示全撤後＝一般復原</td></tr>
+      <tr><td>左鍵快速連點兩下（影片標註上）</td><td>選取工具：選取該標註並進入編輯模式（等同 <kbd>E</kbd>）</td></tr>
+      <tr><td><kbd>Alt</kbd>+左鍵拖曳（編輯模式，polygon）</td><td>沿滑鼠軌跡重繪該段邊緣（放開套用；<kbd>Ctrl+Z</kbd> 可復原）</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>播放 / 暫停</td></tr>
+      <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>上一個 / 下一個標註（跳過被隱藏的；收合不算隱藏）</td></tr>
+      <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>±1 frame</td></tr>
+      <tr><td><kbd>Shift+←/→</kbd></td><td>±10 frames</td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>時段：設終點/確認預設類別；多邊形/折線收尾</td></tr>
+      <tr><td>縮放鈕（時間軸右下）</td><td>每按一級循環：100% → 200% → 400% → 800% → frame → 100%</td></tr>
+      <tr><td>雙擊時間軸標註</td><td>編輯彈窗（改類別/起訖，與影片同步）</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>取消繪製 / 關閉面板</td></tr>
+      <tr><td><kbd>Del</kbd></td><td>刪除選取的標註</td></tr>
+      <tr><td><kbd>N</kbd></td><td>自動套用上次類別（畫完不跳選單）開/關</td></tr>
+      <tr><td><kbd>Ctrl+點擊</kbd></td><td>polygon/polyline 增（邊）/ 刪（點）頂點</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd></td><td>復原上一動（新增/刪除/修改皆可；批次操作一次全部復原；繪製多邊形中＝移除上一頂點）</td></tr>
+      <tr><td><kbd>Ctrl+Shift+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>重做（取消復原）</td></tr>
+      <tr><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td><td>複製選取 / 貼上形狀到目前 frame</td></tr>
+      <tr><td><kbd>Shift</kbd>+左鍵（影片/時間軸）</td><td>多選標註（加選 / 減選）</td></tr>
+      <tr><td>gutter ☑ 鈕</td><td>全選該類別的所有標註（加入多選；再按一次取消）</td></tr>
+      <tr><td>多選後 <kbd>Del</kbd></td><td>批次刪除（一次確認）</td></tr>
+      <tr><td>多選後「改類別…」</td><td>批次改 label（同一層才可）</td></tr>
+      <tr><td>多選後 <kbd>Ctrl+C</kbd> → <kbd>Ctrl+V</kbd></td><td>批次複製；spatial 複製當前 frame 形狀、temporal 整組平移到目前 frame</td></tr>
+      <tr><td>gutter ▸/▾ 鈕</td><td>收合/展開軌道群組（只摺疊畫面，不隱藏標註）</td></tr>
+      <tr><td>眼睛鈕（gutter / 右側面板）</td><td>分層隱藏：層 / 形狀 / 類別 / 單一標註</td></tr>
+      <tr><td><kbd>Ctrl+滾輪（影片）</kbd></td><td>影片縮放；空白處雙擊重置</td></tr>
+      <tr><td>滾輪（影片，zoom&gt;100%）</td><td>上下平移；<kbd>Shift</kbd>+滾輪＝左右平移；也可拖曳畫面下緣/右緣的捲動 bar</td></tr>
+      <tr><td>滾輪（時間軸）</td><td>上下捲動；<kbd>Shift</kbd>+滾輪 = 水平移動</td></tr>
+      <tr><td><kbd>Ctrl+滾輪（時間軸）</kbd></td><td>時間軸縮放（游標為中心）</td></tr>
+      <tr><td>拖曳影片/時間軸交界分隔線</td><td>調整兩者高度比例</td></tr>
+    </table></div>
+
+    <p>補充（介面清單未列、但可用）：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th style="width:230px">按鍵</th><th>功能</th></tr>
+      <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>跳到影片開頭 / 結尾</td></tr>
+      <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>複製目前 frame 上所有可見形狀</td></tr>
+      <tr><td><kbd>Backspace</kbd></td><td>同 <kbd>Del</kbd>（刪除選取）</td></tr>
+      <tr><td>雙擊（繪製多邊形/折線中）</td><td>同 <kbd>Enter</kbd> 收尾</td></tr>
+      <tr><td>類別選單內 <kbd>↑</kbd>/<kbd>↓</kbd>/<kbd>Enter</kbd></td><td>移動 / 選定類別</td></tr>
+    </table></div>
+    <div class="note">游標在輸入框 / 下拉選單裡時快捷鍵不作用（避免打字誤觸）。任何彈出視窗開啟時，只有 <kbd>Esc</kbd>（關閉）有效。</div>
+  </section>
+
+  <!-- 12 ============================================================= -->
+  <section id="s12">
+    <h2 class="sec"><span class="num">12</span>匯出資料集</h2>
+
+    <h3>方式 A：專案頁「📦 下載資料集」（不用開終端機）</h3>
+    <p>上半部是<strong>互動式下載表單</strong>，四個選項自由組合後直接下載 zip：</p>
+    <ol class="steps">
+      <li><b>格式</b>：
+        <ul>
+          <li><b>MOSaiC JSON</b>：每支影片一份 MOSaiC 格式 JSON（temporal＋spatial 標註）。</li>
+          <li><b>COCO</b>：spatial 標註轉 COCO（物件偵測/分割）。</li>
+          <li><b>YOLO</b>：spatial 標註轉 YOLO（偵測＋分割 txt＋<code>data.yaml</code>）。</li>
+        </ul></li>
+      <li><b>內容</b>：<b>label + images</b>（標註＋對應影像）或 <b>label only</b>（只要標註檔，不含影像）。</li>
+      <li><b>範圍</b>：<b>全部</b> / <b>只要 spatial</b> / <b>只要 temporal</b> /
+        <b>以 temporal 規則篩選 spatial</b>——勾選一個或多個 temporal 類別（<strong>可複選＝聯集</strong>，
+        如同時勾兩個 event），只匯出落在任一勾選類別標註時間範圍內的 spatial 標註。
+        搭配「抽樣生成 event」（第 9 節）即可取得<strong>等間隔抽樣</strong>的 spatial 資料集。</li>
+      <li><b>類別勾選</b>：列出專案 taxonomy 全部類別（預設全選），把不要的取消勾選即可。</li>
+      <li>按「<b>⬇ 下載資料集</b>」→ 匯出完成後瀏覽器直接下載 zip（依標註量可能需數分鐘，請勿關閉頁面）。</li>
+    </ol>
+    <p>下半部「<b>其他匯出（原有流程）</b>」保留原本的整包匯出：
+      <b>MOSaiC / COCO / YOLO</b>（不套用篩選）、<b>temporal</b>（CSV＋JSON 快照）、<b>spatial</b>（COCO＋抽幀影像）
+      ——按「匯出」後顯示統計並出現 <b>⬇ 下載 run_id.zip</b> 連結。</p>
+    <div class="note"><b>匯出範圍＝本專案</b>（只含此專案的影片與標註）。
+      MOSaiC / COCO / YOLO 需抽取影像並打包，
+      依標註量可能要數分鐘，匯出中請勿關閉頁面。CLI 亦可用 <code>-P 專案編碼</code> 限定專案（見方式 B）。</div>
+
+    <h3>方式 B：管理者用 <code>surgann</code> 指令（訓練用格式轉換）</h3>
+    <p>每次匯出會在 <code>data/exports/</code> 建一個獨立 run 目錄，含完整快照、可重現。常用：</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>指令</th><th>產出</th></tr>
+      <tr><td><code>surgann export-dataset -f yolo</code>（或 <code>-f mosaic</code> / <code>-f coco</code>）</td>
+          <td>同方式 A 的三種資料集匯出：YOLO 偵測＋分割（<code>images/ labels/ labels_seg/ data.yaml</code>＋<code>images_meta.csv</code> sidecar）
+              / MOSaiC JSON＋影像 / COCO＋影像。</td></tr>
+      <tr><td><code>surgann export-dataset -f frame-pairs --interval sample_5s</code></td>
+          <td>temporal → <b>影格–label 配對</b>（抽樣 frame JPEG＋<code>image_label_pairs.csv</code>）。</td></tr>
+      <tr><td><code>surgann export-dataset -f clip --cut</code></td>
+          <td>temporal → <b>clip–label 配對</b>（<code>clip_label_pairs.csv</code>；<code>--cut</code> 加切出 <code>clips/*.mp4</code>）。</td></tr>
+      <tr><td><code>surgann export-temporal</code> / <code>export-spatial</code></td>
+          <td>與方式 A 相同的兩種匯出（CSV＋JSON 快照 / COCO＋抽幀影像）。</td></tr>
+      <tr><td><code>-P 專案編碼</code>（如 <code>surgann export-dataset -f yolo -P default</code>）</td>
+          <td><code>export-dataset</code> / <code>export-temporal</code> / <code>export-spatial</code> 皆可加，
+              匯出<b>限定該專案</b>；省略＝全 registry。</td></tr>
+      <tr><td><code>surgann derive</code></td>
+          <td>由連續區段推導每 5s / 30s 抽樣點的 frame-level label CSV。</td></tr>
+      <tr><td><code>surgann export-mosaic --video ABCD_0001</code> / <code>import-mosaic</code></td>
+          <td>與 <b>MOSaiC</b> 平台 JSON 格式互轉（座標百分比↔像素自動換算，可 round-trip）。</td></tr>
+    </table></div>
+    <p>所有含時間的輸出都遵守 <code>time = frame ÷ fps</code> 並在寫檔後自檢，不會產出時間錯位的資料集。</p>
+  </section>
+
+  <!-- 13 ============================================================= -->
+  <section id="s13">
+    <h2 class="sec"><span class="num">13</span>常見問題</h2>
+
+    <h3>影片沒出現在專案裡？</h3>
+    <p>影片必須先<strong>入庫</strong>，而且要<strong>加入本專案</strong>（第 2 節）。已入庫的影片：
+       用「🎬 影片」分頁的「＋ 加入影片」或「📥 上傳資料」的「＋ 加入此專案」。
+       還沒入庫的：到「📥 上傳資料」選好系列後按「入庫」（病人資料夾請走「📥 影片入庫」頁）；若掃描表裡沒有該檔案，
+       請管理者把影片放到伺服器的 <code>data/raw_videos/</code> 再重新整理。也可由管理者用指令入庫：</p>
+    <pre><code>surgann ingest data/raw_videos/你的影片.mp4 --video-id ABCD_0004</code></pre>
+
+    <h3>入庫按了很久沒反應？</h3>
+    <p>轉檔（標準化成 25fps）依影片長度需要數分鐘，狀態欄會顯示「⏳ 入庫中…」並自動更新；完成後「🎬 影片」分頁會多出新卡片。若顯示 ✗ 錯誤訊息，把訊息轉給管理者。</p>
+
+    <h3>畫完形狀但按了 Esc，標註不見了？</h3>
+    <p>正常——類別選單出現時按 <kbd>Esc</kbd> 表示<strong>放棄</strong>這次繪製，形狀不會存。要保留就得選一個類別。</p>
+
+    <h3>畫面上的標註太多、互相蓋住？</h3>
+    <p>用 <b>👁</b> 分層隱藏（第 8 節）：可一鍵隱藏整層（如整個 spatial）、整個形狀種類、單一類別，或單筆標註——
+       時間軸 gutter 與 layers 面板都有眼睛鈕。標完再點回來顯示。隱藏只影響顯示，資料不動。</p>
+
+    <h3>spatial 形狀在別的 frame 位置怪怪的？</h3>
+    <p>那是<strong>線性插值</strong>在兩個 keypoint 之間補出來的位置。到位置不對的 frame 把形狀拖正——這會存一個新 keypoint，插值即被修正。
+       若這個物件不該連續移動（例如只出現幾個瞬間），把詳情面板的「插值」關掉，形狀就只在 keypoint frame 顯示。</p>
+
+    <h3>我的標註存在哪裡？會不會不見？</h3>
+    <p>每個動作都<strong>即時寫進 registry</strong>（<code>registry/registry.db</code>），不是暫存在瀏覽器；換影片、關分頁都不會遺失。
+       管理者會定期用 <code>surgann backup</code> 做快照備份。</p>
+
+    <h3>標註位置好像有時間偏移？</h3>
+    <p>檢查該影片是否通過 ingest 的固定幀率（CFR 25fps）驗證——只有可變幀率（VFR）的影片才會漂移。
+       <code>surgann status</code> 應顯示 fps=25。</p>
+
+    <h3>新增錯了類別想刪掉？</h3>
+    <p>介面不提供刪除類別（避免既有標註失效），請找管理者處理。標註本身可隨時刪（<b>🗑</b> 或 <kbd>Del</kbd>）。</p>
+
+    <h3>想換介面的 port？</h3>
+    <p>管理者改 <code>deploy/.env</code> 的 <code>ANNOTATOR_PORT</code>，或啟動時 <code>surgann annotate --port &lt;數字&gt;</code>。</p>
+
+    <h3>可以標像素級的 mask 嗎？</h3>
+    <p>目前提供框／多邊形／點／橢圓／折線與 ✨ SAM 智慧輔助（第 7 節），尚未提供像素筆刷。
+       需要 segmentation 時用多邊形標（SAM 可一鍵產生貼合輪廓的多邊形），匯出 COCO 時即為分割標註。</p>
+  </section>
+
+  <footer>
+    SurgAnnFlow Annotator ・ 手術影片標註平台使用手冊 ・ 有問題先看
+    <a href="#s13">常見問題</a>，或詢問平台管理者。
+  </footer>
+
+</div>
+<script>
+/* 語言切換（手冊採 zh/en 雙檔平行）：若使用者已選英文則導向英文手冊；切換鈕存語言後前往英文版。 */
+(function () {
+  try { if (localStorage.getItem("surgann_lang") === "en") { location.replace("guide_en.html"); return; } } catch (e) {}
+  var b = document.getElementById("langToggle");
+  if (b) b.onclick = function (e) {
+    e.preventDefault();
+    try { localStorage.setItem("surgann_lang", "en"); } catch (x) {}
+    location.href = "guide_en.html";
+  };
+})();
+</script>
+</body>
+</html>

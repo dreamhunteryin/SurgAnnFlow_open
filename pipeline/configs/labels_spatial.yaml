@@ -1,0 +1,37 @@
+# Spatial 標註 taxonomy（草稿；本檔僅作 default 專案的種子，之後以 registry labels 表為準）。
+# CVAT label type 一律 any（同一 label 可用 bbox / polygon / mask / points 標）。
+# 顏色為 CVAT 顯示用（#hex）。
+
+project_name: SurgAnn Spatial
+
+labels:
+  # --- 器械（CholecT50 instruments）---
+  - name: grasper
+    color: "#4dc9b0"
+  - name: bipolar
+    color: "#e6a23c"
+  - name: hook
+    color: "#5b9bd5"
+  - name: scissors
+    color: "#c678dd"
+  - name: clipper
+    color: "#98c379"
+  - name: irrigator
+    color: "#56b6c2"
+  # --- 解剖構造 ---
+  - name: gallbladder
+    color: "#e06c75"
+  - name: cystic_duct
+    color: "#d19a66"
+  - name: cystic_artery
+    color: "#f471b5"
+  - name: liver
+    color: "#a0522d"
+  - name: omentum
+    color: "#facc15"
+  - name: blood
+    color: "#dc2626"
+
+task:
+  segment_size: 125   # 每個 job 的影像張數（job 為 CVAT 的指派單位）
+  image_quality: 95

@@ -1,0 +1,8 @@
+# 安裝請用（在專案根目錄）——依機器擇一：
+#   pip install -e . -r deploy/requirements-gpu.txt   # 有 NVIDIA GPU（鎖版組合見該檔註解）
+#   pip install -e . -r deploy/requirements-cpu.txt   # 無 NVIDIA GPU
+# `-e .` 會依 pyproject.toml 裝好共用相依並註冊 surgann 指令；配方檔只補 onnxruntime（CPU/GPU 互斥）。
+#
+# 本檔保留給習慣 `pip install -r requirements.txt` 的工具：等同 GPU 配方，不含 `-e .`。
+# 共用相依的單一來源是 pyproject.toml，請勿在此重列。
+-r deploy/requirements-gpu.txt

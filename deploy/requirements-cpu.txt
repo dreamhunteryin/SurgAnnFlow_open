@@ -1,0 +1,10 @@
+# 安裝配方：無 NVIDIA GPU（CPU-only）。在專案根目錄執行：
+#   python3 -m venv .venv && . .venv/bin/activate
+#   pip install -U pip
+#   pip install -e . -r deploy/requirements-cpu.txt
+# 預期：最後一行出現 Successfully installed ... surgann-0.1.0 ...；之後 `surgann doctor` 可用。
+#
+# 共用相依（typer/fastapi/numpy/opencv…）寫在 pyproject.toml，本檔只補「機器相依」的部分。
+# CPU 模式下：SAM 首擊秒級（可用但較慢）、OOB 推論約為 GPU 的數倍時間、轉檔走 libx264。
+# 與 onnxruntime-gpu 互斥：同一個 venv 只能裝其中一個（surgann doctor 會檢查）。
+onnxruntime>=1.20

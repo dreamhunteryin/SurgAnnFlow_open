@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title data-i18n="up.title">SurgAnnFlow — 影片入庫</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css?v=20261102-1">
+<script src="i18n.js?v=20261102-1"></script>
+</head>
+<body class="landing">
+<header id="topbar">
+  <a class="topbar-link" href="./" data-i18n="nav.home">← 首頁</a>
+  <span class="brand">SurgAnnFlow</span>
+  <span class="dim" data-i18n="up.label">影片入庫</span>
+  <span class="spacer"></span>
+  <a class="topbar-link" href="guide.html" target="_blank" rel="noopener" data-i18n="nav.guide">📖 使用手冊</a>
+  <button class="topbar-link" id="langToggle" type="button"></button>
+</header>
+
+<main id="landMain">
+
+  <!-- ============ 系列管理 ============ -->
+  <section class="up-sec" id="series">
+    <h2><span data-i18n="up.h_series">系列（資產層）</span><span id="serCount" class="dim"></span></h2>
+    <div class="panel-note" data-i18n-html="up.series_note">
+      <b>系列</b>＝影片入庫的分群單位（如同一批來源/術式），與標註專案互相獨立。
+      系列 ID 為系統產生的四碼英文（不可改），影片編號依系列自動配號（如 <code>ABCD_0001</code>）。
+      名稱／機構／手術類別隨時可改，ID 與影片編號不受影響。
+    </div>
+    <table class="ptable" style="max-width:1000px">
+      <thead><tr><th data-i18n="up.th_id">ID</th><th data-i18n="up.th_name">名稱</th><th data-i18n="up.th_inst">機構</th><th data-i18n="up.th_surgery">手術類別</th><th data-i18n="up.th_note">備註</th>
+        <th data-i18n="up.th_nvideos">影片數</th><th></th></tr></thead>
+      <tbody id="serBody"></tbody>
+    </table>
+  </section>
+
+  <!-- ============ 入庫新影片 ============ -->
+  <section class="up-sec" id="ingest">
+    <h2 data-i18n="up.h_ingest">入庫新影片（病人資料夾 → 合併 → 去識別化 → 標準化）</h2>
+    <div class="panel-note" data-i18n-html="up.ingest_note">
+      每個<b>病人資料夾</b>（內含一段或多段錄影檔）會被處理成<b>一支</b>標準化影片：
+      依檔名排序合併（順序由你確認）→ 偵測體外（out-of-body）畫面 → <b>人工核可</b>切除段（QC 關卡）
+      → 切除並轉成 720p/25fps → 去音軌與 metadata → 依系列自動配號入庫。
+      原始檔全程唯讀；入庫成功後原始資料夾移至 <code>archived/</code> 保存（不刪除）。
+    </div>
+
+    <div class="up-target">
+      <label data-i18n="up.tgt_series">入庫到系列</label><select id="tgtSeries"></select>
+      <label data-i18n="up.tgt_project">完成後加入專案</label><select id="tgtProject"></select>
+      <span class="dim" data-i18n="up.tgt_hint">（系列必選；專案可選）</span>
+    </div>
+
+    <div class="up-tabs">
+      <button class="up-tab active" data-tab="disk" data-i18n="up.tab_disk">🖴 伺服器磁碟選取</button>
+      <button class="up-tab" data-tab="browser" data-i18n="up.tab_browser">🌐 瀏覽器上傳</button>
+    </div>
+
+    <!-- 入口 A：伺服器磁碟 -->
+    <div id="tab-disk">
+      <div class="panel-note" data-i18n-html="up.disk_note">
+        把病人資料夾放到伺服器的 <code>data/raw_videos/_incoming/</code>（一夾一病人）後按重新掃描。
+      </div>
+      <div class="dl-row">
+        <button id="scanBtn" data-i18n="up.rescan">🔄 重新掃描</button>
+        <span id="scanStatus" class="dim"></span>
+      </div>
+      <table class="ptable" style="max-width:1000px">
+        <thead><tr><th data-i18n="up.th_patient">病人資料夾</th><th data-i18n="up.th_nfiles">檔案數</th><th data-i18n="up.th_size">大小</th><th data-i18n="up.th_totaldur">總時長</th>
+          <th data-i18n="up.th_status">狀態</th><th></th></tr></thead>
+        <tbody id="scanBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 入口 B：瀏覽器上傳 -->
+    <div id="tab-browser" class="hidden">
+      <div class="panel-note" data-i18n-html="up.browser_note">
+        選取整個病人資料夾，切成 50MB 區塊循序上傳（斷線可續傳；上傳中請勿關閉此分頁）。
+        完成後資料夾會出現在左邊「伺服器磁碟選取」清單，再做排序確認與入庫。
+      </div>
+      <div class="dl-row">
+        <input type="file" id="upPick" webkitdirectory directory multiple>
+      </div>
+      <div id="upInfo" class="panel-note"></div>
+      <div class="dl-row">
+        <button class="primary" id="upGo" disabled data-i18n="up.start_upload">⬆ 開始上傳</button>
+        <span class="progress-outer"><span class="progress-inner" id="upBar"></span></span>
+        <span id="upStatus" class="dim"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Job 看板 ============ -->
+  <section class="up-sec" id="jobs">
+    <h2><span data-i18n="up.h_jobs">處理佇列</span> <span id="jobCount" class="dim"></span></h2>
+    <div class="panel-note" data-i18n-html="up.jobs_note">
+      單一 worker 依序處理（一次一夾）。<b>待 QC 核可</b>的 job 需要你檢視建議切除段並核可後才會繼續。
+      伺服器重啟不影響佇列，會自動從中斷的階段續跑。
+    </div>
+    <table class="ptable" style="max-width:1100px">
+      <thead><tr><th data-i18n="up.th_created">建立時間</th><th data-i18n="up.th_patient">病人資料夾</th><th data-i18n="up.th_series">系列</th><th data-i18n="up.th_stage">階段</th>
+        <th data-i18n="up.th_progress">進度</th><th></th></tr></thead>
+      <tbody id="jobBody"></tbody>
+    </table>
+    <div class="dl-row">
+      <span id="reclaim" class="dim"></span>
+      <button id="reclaimBtn">🔄</button>
+    </div>
+  </section>
+</main>
+
+<!-- 合併順序確認 modal（決策 H：拖曳調序） -->
+<div id="orderModal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head"><h2><span data-i18n="up.order_title">確認合併順序 — </span><span id="omFolder"></span></h2>
+      <button class="modal-close" id="omClose">✕</button></div>
+    <div class="modal-pad">
+      <div class="panel-note" data-i18n-html="up.order_note">
+        下列檔案將<b>由上而下</b>依序合併成一支影片。預設為檔名排序，
+        <b>可拖曳調整順序</b>；確認前請比對錄影段落先後（順序錯了合併結果無法回復）。
+      </div>
+      <div id="omWarn"></div>
+      <div id="omList" class="order-list"></div>
+      <div class="dim" id="omSummary"></div>
+    </div>
+    <div class="modal-foot" style="text-align:right">
+      <span id="omStatus" class="dim" style="margin-right:10px"></span>
+      <button class="primary" id="omGo" data-i18n="up.order_go">✓ 確認順序，排入處理佇列</button>
+    </div>
+  </div>
+</div>
+
+<!-- OOB QC 核可 modal（輕量 QC 關卡） -->
+<div id="qcModal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head"><h2><span data-i18n="up.qc_title">QC：核可切除段 — </span><span id="qcFolder"></span></h2>
+      <button class="modal-close" id="qcClose">✕</button></div>
+    <div class="modal-pad" style="max-height:70vh;overflow-y:auto">
+      <div class="panel-note" data-i18n-html="up.qc_note">
+        以下是自動偵測到的<b>體外（out-of-body）</b>段落，將從影片中<b>切除</b>（邊界已自動外擴 ±1 秒）。
+        請抽查縮圖：可微調起訖秒數、刪除誤判段、或新增漏抓段。
+        <b>核可後才會開始切除與轉檔</b>；誤留體外畫面＝隱私事故，寧可多切。
+        切除段為模型依體外機率門檻 0.7 建議；標「<b>存疑</b>」＝模型不太確定該段是否真為體外，請優先檢查這些段的縮圖。
+      </div>
+      <div class="dim" id="qcMeta"></div>
+      <div id="qcSegs"></div>
+      <div class="dl-row"><button id="qcAdd" data-i18n="up.qc_add">＋ 新增切除段</button></div>
+    </div>
+    <div class="modal-foot" style="text-align:right">
+      <span id="qcSummary" class="dim" style="margin-right:10px"></span>
+      <button class="primary" id="qcGo" data-i18n="up.qc_go">✓ 核可切除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method, headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) {
+    let d = ""; try { const j = await r.json(); d = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch {}
+    throw new Error(`${r.status} ${d}`);
+  }
+  return r.json();
+}
+function fmtDur(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return (h ? `${h}:${String(m).padStart(2, "0")}` : `${m}`) + `:${String(s).padStart(2, "0")}`;
+}
+function fmtSize(b) {
+  if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1) + " GB";
+  if (b >= 1 << 20) return (b / (1 << 20)).toFixed(1) + " MB";
+  return Math.round((b || 0) / 1024) + " KB";
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const VIDEO_EXTS = [".mp4", ".mov", ".avi", ".mpg", ".mpeg", ".mkv"];
+const STAGE_TXT = { merge: t("up.stage.merge"), oob: t("up.stage.oob"), cut_encode: t("up.stage.cut_encode"),
+                    verify: t("up.stage.verify"), register: t("up.stage.register"), done: t("up.stage.done") };
+const STATUS_TXT = { queued: t("up.status.queued"), running: t("up.status.running"), awaiting_qc: t("up.status.awaiting_qc"),
+                     done: t("up.status.done"), failed: t("up.status.failed"), cancelled: t("up.status.cancelled") };
+
+let seriesList = [], projectsList = [], scanFolders = [], jobList = [];
+
+// ================= 系列管理 =================
+async function loadSeries() {
+  seriesList = await api("GET", "/api/series");
+  $("serCount").textContent = t("up.series_count", seriesList.length);
+  renderSeriesTable();
+  renderTargetSelects();
+}
+function renderSeriesTable() {
+  const body = $("serBody");
+  body.innerHTML = "";
+  for (const s of seriesList) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td><code>${esc(s.series_id)}</code></td>` +
+      `<td><input class="up-inline" value="${esc(s.name)}"></td>` +
+      `<td><input class="up-inline" value="${esc(s.institution || "")}" placeholder="—"></td>` +
+      `<td><input class="up-inline" value="${esc(s.surgery_type || "")}" placeholder="—"></td>` +
+      `<td><input class="up-wide" value="${esc(s.note || "")}" placeholder="—"></td>` +
+      `<td class="dim">${s.n_videos}</td><td><button data-save>${t("up.save")}</button></td>`;
+    const [nameIn, instIn, typeIn, noteIn] = tr.querySelectorAll("input");
+    tr.querySelector("[data-save]").onclick = async () => {
+      try {
+        await api("PATCH", `/api/series/${encodeURIComponent(s.series_id)}`, {
+          name: nameIn.value.trim(), institution: instIn.value.trim(),
+          surgery_type: typeIn.value.trim(), note: noteIn.value.trim(),
+        });
+        await loadSeries();
+      } catch (e) { alert(t("up.save_fail", e.message)); }
+    };
+    body.appendChild(tr);
+  }
+  // 新增列
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    `<td class="dim">${t("up.auto")}</td>` +
+    `<td><input class="up-inline" placeholder="${t("up.new_series_ph")}"></td>` +
+    `<td><input class="up-inline" placeholder="${t("up.inst_ph")}"></td>` +
+    `<td><input class="up-inline" placeholder="${t("up.surgery_ph")}"></td>` +
+    `<td><input class="up-wide" placeholder="${t("up.note_ph")}"></td>` +
+    `<td></td><td><button class="primary" data-add>${t("up.create")}</button></td>`;
+  const [nameIn, instIn, typeIn, noteIn] = tr.querySelectorAll("input");
+  const addFn = async () => {
+    const name = nameIn.value.trim();
+    if (!name) { alert(t("up.need_series_name")); return; }
+    try {
+      await api("POST", "/api/series", {
+        name, institution: instIn.value.trim() || null,
+        surgery_type: typeIn.value.trim() || null, note: noteIn.value.trim() || null,
+      });
+      await loadSeries();
+    } catch (e) { alert(t("up.create_fail", e.message)); }
+  };
+  tr.querySelector("[data-add]").onclick = addFn;
+  nameIn.addEventListener("keydown", (e) => { if (e.key === "Enter") addFn(); });
+  body.appendChild(tr);
+}
+function renderTargetSelects() {
+  const sSel = $("tgtSeries"), prev = sSel.value;
+  sSel.innerHTML = `<option value="">${t("proj.select_series")}</option>` + seriesList.map(s =>
+    `<option value="${esc(s.series_id)}">${t("up.series_opt2", esc(s.name), esc(s.series_id), s.n_videos)}</option>`).join("");
+  if ([...sSel.options].some(o => o.value === prev)) sSel.value = prev;
+  const pSel = $("tgtProject"), prevP = pSel.value;
+  pSel.innerHTML = `<option value="">${t("up.no_project_opt")}</option>` + projectsList.map(p =>
+    `<option value="${esc(p.project_id)}">${esc(p.name)}</option>`).join("");
+  if ([...pSel.options].some(o => o.value === prevP)) pSel.value = prevP;
+}
+
+// ================= tabs =================
+for (const btn of document.querySelectorAll(".up-tab")) {
+  btn.onclick = () => {
+    document.querySelectorAll(".up-tab").forEach(b => b.classList.toggle("active", b === btn));
+    $("tab-disk").classList.toggle("hidden", btn.dataset.tab !== "disk");
+    $("tab-browser").classList.toggle("hidden", btn.dataset.tab !== "browser");
+  };
+}
+
+// ================= 伺服器磁碟掃描 =================
+async function loadScan() {
+  $("scanStatus").textContent = t("up.scanning");
+  try {
+    const res = await api("GET", "/api/incoming-scan");
+    scanFolders = res.folders;
+    $("scanStatus").textContent = "";
+  } catch (e) { $("scanStatus").textContent = t("up.err", e.message); return; }
+  const body = $("scanBody");
+  body.innerHTML = scanFolders.length ? "" :
+    `<tr><td colspan="6" class="dim">${t("up.no_incoming")}</td></tr>`;
+  for (const f of scanFolders) {
+    const tr = document.createElement("tr");
+    let st, act = "";
+    if (f.error) {
+      st = `<span class="err-mark" title="${esc(f.error)}">✗ ${esc(f.error.slice(0, 60))}</span>`;
+    } else if (f.job) {
+      st = `<span class="badge st-${esc(f.job.status)}">${STATUS_TXT[f.job.status] || esc(f.job.status)}</span>`;
+    } else {
+      st = `<span class="dim">${t("up.await_ingest")}${f.single_file ? t("up.single_file") : ""}</span>` +
+           (f.mtime_mismatch ? ` <span class="err-mark" title="${esc(t("up.mtime_mismatch_title"))}">${t("up.mtime_mismatch")}</span>` : "");
+      act = `<button class="primary" data-order>${t("up.order_and_ingest")}</button>`;
+    }
+    tr.innerHTML =
+      `<td><code>${esc(f.patient_folder)}</code></td>` +
+      `<td class="dim">${f.files ? f.files.length : "—"}</td>` +
+      `<td class="dim">${f.total_bytes != null ? fmtSize(f.total_bytes) : "—"}</td>` +
+      `<td class="dim">${f.total_duration != null ? fmtDur(f.total_duration) : "—"}</td>` +
+      `<td>${st}</td><td>${act}</td>`;
+    const btn = tr.querySelector("[data-order]");
+    if (btn) btn.onclick = () => openOrderModal(f);
+    body.appendChild(tr);
+  }
+}
+$("scanBtn").onclick = loadScan;
+
+// ================= 合併順序確認（拖曳調序，決策 H） =================
+let omFolderData = null, omOrder = [];
+function openOrderModal(f) {
+  if (!$("tgtSeries").value) { alert(t("up.select_series_first")); return; }
+  omFolderData = f;
+  omOrder = f.files.map(x => x.name);
+  $("omFolder").textContent = f.patient_folder;
+  $("omWarn").innerHTML = f.mtime_mismatch
+    ? `<div class="err-mark">${t("up.order_warn")}</div>` : "";
+  $("omStatus").textContent = "";
+  renderOrderList();
+  $("orderModal").classList.remove("hidden");
+}
+function renderOrderList() {
+  const host = $("omList");
+  host.innerHTML = "";
+  const byName = Object.fromEntries(omFolderData.files.map(x => [x.name, x]));
+  omOrder.forEach((name, i) => {
+    const f = byName[name];
+    const item = document.createElement("div");
+    item.className = "order-item";
+    item.draggable = omOrder.length > 1;
+    item.dataset.name = name;
+    item.innerHTML = `<span class="grip">⠿</span><span class="onum">${i + 1}.</span>` +
+      `<span class="oname">${esc(name)}</span>` +
+      `<span class="dim">${fmtSize(f.size_bytes)} ・ ${fmtDur(f.duration_sec)}</span>`;
+    item.addEventListener("dragstart", () => { item.classList.add("dragging"); });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      omOrder = [...host.children].map(el => el.dataset.name);
+      renderOrderList();
+    });
+    host.appendChild(item);
+  });
+  host.ondragover = (e) => {
+    e.preventDefault();
+    const dragging = host.querySelector(".dragging");
+    if (!dragging) return;
+    const after = [...host.children].filter(el => !el.classList.contains("dragging"))
+      .find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
+    if (after) host.insertBefore(dragging, after); else host.appendChild(dragging);
+  };
+  $("omSummary").textContent = t("up.order_summary", omOrder.length, fmtDur(omFolderData.total_duration), omFolderData.single_file);
+}
+$("omClose").onclick = () => $("orderModal").classList.add("hidden");
+$("orderModal").onclick = (e) => { if (e.target === $("orderModal")) $("orderModal").classList.add("hidden"); };
+$("omGo").onclick = async () => {
+  $("omGo").disabled = true;
+  $("omStatus").textContent = t("up.enqueuing");
+  try {
+    await api("POST", "/api/pipeline/jobs", {
+      patient_folder: omFolderData.patient_folder,
+      series_id: $("tgtSeries").value,
+      project_id: $("tgtProject").value || null,
+      params: { file_order: omOrder },
+    });
+    $("orderModal").classList.add("hidden");
+    await Promise.all([loadJobs(), loadScan()]);
+  } catch (e) { $("omStatus").textContent = ""; alert(t("up.enqueue_fail", e.message)); }
+  $("omGo").disabled = false;
+};
+
+// ================= 瀏覽器上傳（50MB chunk 循序 POST，斷點續傳） =================
+const CHUNK = 50 * 1024 * 1024;
+let upFiles = [], upFolder = "";
+$("upPick").addEventListener("change", () => {
+  const all = [...$("upPick").files];
+  upFiles = all.filter(f => VIDEO_EXTS.some(e => f.name.toLowerCase().endsWith(e)));
+  upFolder = all.length ? (all[0].webkitRelativePath.split("/")[0] || "folder") : "";
+  const skipped = all.length - upFiles.length;
+  $("upInfo").innerHTML = all.length
+    ? t("up.folder_info", `<code>${esc(upFolder)}</code>`, upFiles.length, fmtSize(upFiles.reduce((a, f) => a + f.size, 0)), skipped)
+    : "";
+  upGoGate();
+});
+// 系列必選才准開始上傳（未選就開傳 → 落地後忘記入庫哪個系列，2026-07-17 實際踩雷）
+function upGoGate() {
+  const ok = upFiles.length && $("tgtSeries").value;
+  $("upGo").disabled = !ok;
+  $("upGo").title = ok ? "" : t("up.upload_gate_title");
+}
+$("tgtSeries").addEventListener("change", upGoGate);
+$("upGo").onclick = async () => {
+  if (!upFiles.length) return;
+  if (!$("tgtSeries").value) { alert(t("up.need_series_upload")); return; }
+  $("upGo").disabled = true; $("upPick").disabled = true;
+  const key = `surgann_upload_${upFolder}`;
+  let uploadId = localStorage.getItem(key);
+  if (!uploadId) { uploadId = crypto.randomUUID(); localStorage.setItem(key, uploadId); }
+  const totalBytes = upFiles.reduce((a, f) => a + f.size, 0);
+  let sentBytes = 0;
+  const q = (f, extra) => `upload_id=${encodeURIComponent(uploadId)}&folder=${encodeURIComponent(upFolder)}` +
+    `&filename=${encodeURIComponent(f.name)}${extra}`;
+  try {
+    for (const f of upFiles) {
+      const nChunks = Math.max(1, Math.ceil(f.size / CHUNK));
+      const st = await api("GET", `/api/upload/status?${q(f, "")}`);
+      const got = new Set(st.received_chunks);
+      for (let i = 0; i < nChunks; i++) {
+        if (got.has(i)) { sentBytes += Math.min(CHUNK, f.size - i * CHUNK); continue; }
+        const blob = f.slice(i * CHUNK, Math.min((i + 1) * CHUNK, f.size));
+        const r = await fetch(`/api/upload/chunk?${q(f, `&index=${i}&total=${nChunks}`)}`,
+                              { method: "POST", body: blob });
+        if (!r.ok) throw new Error(t("up.chunk_fail", r.status));
+        sentBytes += blob.size;
+        $("upBar").style.width = `${(sentBytes / totalBytes * 100).toFixed(1)}%`;
+        $("upStatus").textContent = t("up.uploading", f.name, fmtSize(sentBytes), fmtSize(totalBytes));
+      }
+    }
+    $("upStatus").textContent = t("up.assembling");
+    const res = await api("POST", "/api/upload/complete", {
+      upload_id: uploadId, folder: upFolder,
+      files: upFiles.map(f => ({ name: f.name, size: f.size })),
+    });
+    localStorage.removeItem(key);
+    $("upBar").style.width = "100%";
+    $("upStatus").textContent = t("up.landed", res.patient_folder);
+    document.querySelector('.up-tab[data-tab="disk"]').click();
+    await loadScan();
+  } catch (e) {
+    $("upStatus").textContent = t("up.upload_err", e.message);
+  }
+  upGoGate(); $("upPick").disabled = false;
+};
+
+// ================= Job 看板 =================
+async function loadJobs() {
+  try { jobList = await api("GET", "/api/pipeline/jobs?limit=50"); }
+  catch (e) { $("jobBody").innerHTML = `<tr><td colspan="6">${esc(e.message)}</td></tr>`; return; }
+  const active = jobList.filter(j => ["queued", "running", "awaiting_qc"].includes(j.status)).length;
+  $("jobCount").textContent = t("up.jobs_count", jobList.length, active);
+  const body = $("jobBody");
+  body.innerHTML = jobList.length ? "" :
+    `<tr><td colspan="6" class="dim">${t("up.no_jobs")}</td></tr>`;
+  for (const j of jobList) {
+    const tr = document.createElement("tr");
+    const vid = (j.artifacts || {}).video_id;
+    const stage = `<span class="badge st-${esc(j.status)}">${STATUS_TXT[j.status] || esc(j.status)}</span>` +
+      (j.status === "running" || j.status === "queued"
+        ? ` <span class="dim">${STAGE_TXT[j.stage] || esc(j.stage)}</span>` : "") +
+      (j.status === "done" && vid ? ` <code>${esc(vid)}</code>` : "");
+    const prog = `<span class="progress-outer"><span class="progress-inner" style="width:${(j.progress || 0).toFixed(0)}%"></span></span>` +
+      ` <span class="dim">${(j.progress || 0).toFixed(0)}%</span>`;
+    const err = j.error
+      ? `<details class="job-err"><summary class="err-mark">${t("up.err_details")}</summary><pre>${esc(j.error)}</pre></details>` : "";
+    let act = "";
+    if (j.status === "awaiting_qc") act += `<button class="primary" data-qc>${t("up.qc_confirm_btn")}</button> `;
+    if (j.status === "failed") act += `<button data-retry>${t("up.retry")}</button> `;
+    if (j.status !== "running") act += `<button data-del>${t("up.del")}</button>`;
+    tr.innerHTML =
+      `<td class="dim">${esc((j.created_at || "").slice(0, 16).replace("T", " "))}</td>` +
+      `<td><code>${esc(j.patient_folder)}</code>${err}</td>` +
+      `<td>${esc(j.series_id)}</td><td>${stage}</td><td>${prog}</td><td>${act}</td>`;
+    const qcBtn = tr.querySelector("[data-qc]");
+    if (qcBtn) qcBtn.onclick = () => openQcModal(j.job_id);
+    const rtBtn = tr.querySelector("[data-retry]");
+    if (rtBtn) rtBtn.onclick = async () => {
+      try { await api("POST", `/api/pipeline/jobs/${j.job_id}/retry`); loadJobs(); }
+      catch (e) { alert(t("up.retry_fail", e.message)); }
+    };
+    const delBtn = tr.querySelector("[data-del]");
+    if (delBtn) delBtn.onclick = () => deleteJob(j);
+    body.appendChild(tr);
+  }
+}
+async function deleteJob(j) {
+  if (!confirm(t("up.confirm_del_job", j.patient_folder))) return;
+  let purge = false;
+  if (j.status === "failed")      // 二次確認才帶 purge（R9）
+    purge = confirm(t("up.confirm_purge"));
+  try {
+    const res = await api("DELETE", `/api/pipeline/jobs/${j.job_id}?purge=${purge}`);
+    if (res.workdir_purged) alert(t("up.deleted_freed", fmtSize(res.freed_bytes)));
+    await Promise.all([loadJobs(), loadReclaim(), loadScan()]);
+  } catch (e) { alert(t("up.del_fail", e.message)); }
+}
+async function loadReclaim() {
+  try {
+    const r = await api("GET", "/api/pipeline/reclaimable");
+    $("reclaim").textContent =
+      t("up.reclaim", fmtSize(r.archived_bytes), fmtSize(r.failed_workdir_bytes), fmtSize(r.total_bytes));
+  } catch (e) { $("reclaim").textContent = e.message; }
+}
+$("reclaimBtn").onclick = loadReclaim;
+
+// ================= OOB QC modal =================
+let qcJobId = null, qcSegs = [], qcDuration = 0;
+async function openQcModal(jobId) {
+  let job;
+  try { job = await api("GET", `/api/pipeline/jobs/${jobId}`); }
+  catch (e) { alert(e.message); return; }
+  if (job.status !== "awaiting_qc") { alert(t("up.job_not_qc")); loadJobs(); return; }
+  qcJobId = jobId;
+  qcDuration = job.artifacts.merged_duration || 0;
+  // oob_segment_stats 與 segments_oob 逐 index 對齊；舊 job 無此鍵 → stat=null（不顯示徽章）
+  const stats = Array.isArray(job.artifacts.oob_segment_stats) ? job.artifacts.oob_segment_stats : [];
+  qcSegs = (job.artifacts.segments_oob || []).map(([s, e], i) => ({ s, e, stat: stats[i] || null }));
+  $("qcFolder").textContent = job.patient_folder;
+  $("qcMeta").textContent = t("up.qc_meta", fmtDur(qcDuration), qcSegs.length);
+  renderQcSegs();
+  $("qcModal").classList.remove("hidden");
+}
+function qcThumbTimes(s, e) {
+  const dur = e - s;
+  if (dur <= 1.2) return [s + dur / 2];
+  return [s + 0.5, e - 0.5];   // 每段抽頭尾各 1 張
+}
+function renderQcSegs() {
+  const host = $("qcSegs");
+  host.innerHTML = qcSegs.length ? "" :
+    `<div class="panel-note">${t("up.qc_no_segs")}</div>`;
+  qcSegs.forEach((seg, i) => {
+    const div = document.createElement("div");
+    div.className = "qc-seg";
+    // 信心徽章：中位數 >= 0.9 高信心（綠）；< 0.9 存疑（黃）；無 stats（舊 job / 手動新增段）不顯示
+    let conf = "";
+    const st = seg.stat;
+    if (st && typeof st.prob_median === "number") {
+      const med = st.prob_median.toFixed(2);
+      const tip = t("up.conf_tip", med, typeof st.prob_max === "number" ? st.prob_max.toFixed(2) : "—", st.n_samples ?? "—");
+      conf = st.prob_median >= 0.9
+        ? `<span class="badge conf-high" title="${esc(tip)}">${t("up.conf_high", med)}</span>`
+        : `<span class="badge conf-low" title="${esc(tip)}">${t("up.conf_low", med)}</span>`;
+    }
+    div.innerHTML =
+      `<div class="qc-row"><b>${t("up.seg", i + 1)}</b>${conf}` +
+      `<label class="dim">${t("up.qc_start")}</label><input type="number" min="0" max="${qcDuration.toFixed(1)}" step="0.1" value="${seg.s.toFixed(1)}">` +
+      `<label class="dim">${t("up.qc_end")}</label><input type="number" min="0" max="${qcDuration.toFixed(1)}" step="0.1" value="${seg.e.toFixed(1)}">` +
+      `<span class="dim">（${fmtDur(Math.max(0, seg.e - seg.s))}）</span>` +
+      `<span class="spacer"></span><button data-rm>${t("up.qc_remove")}</button></div>` +
+      `<div class="qc-thumbs"></div>`;
+    const [sIn, eIn] = div.querySelectorAll("input");
+    const thumbs = div.querySelector(".qc-thumbs");
+    const drawThumbs = () => {
+      thumbs.innerHTML = "";
+      for (const t of qcThumbTimes(seg.s, seg.e)) {
+        const img = document.createElement("img");
+        img.src = `/api/pipeline/jobs/${qcJobId}/frame?t=${t.toFixed(2)}`;
+        img.title = `t = ${t.toFixed(1)}s`;
+        img.loading = "lazy";
+        thumbs.appendChild(img);
+      }
+    };
+    drawThumbs();
+    sIn.onchange = () => { seg.s = Math.max(0, parseFloat(sIn.value) || 0); renderQcSegs(); };
+    eIn.onchange = () => { seg.e = Math.min(qcDuration, parseFloat(eIn.value) || 0); renderQcSegs(); };
+    div.querySelector("[data-rm]").onclick = () => { qcSegs.splice(i, 1); renderQcSegs(); };
+    host.appendChild(div);
+  });
+  const cut = qcSegs.reduce((a, x) => a + Math.max(0, x.e - x.s), 0);
+  $("qcSummary").textContent = t("up.qc_summary", qcSegs.length, fmtDur(cut), fmtDur(Math.max(0, qcDuration - cut)));
+  $("qcGo").textContent = qcSegs.length ? t("up.qc_go_n", qcSegs.length) : t("up.qc_go_none");
+}
+$("qcAdd").onclick = () => { qcSegs.push({ s: 0, e: Math.min(2, qcDuration) }); renderQcSegs(); };
+$("qcClose").onclick = () => $("qcModal").classList.add("hidden");
+$("qcModal").onclick = (e) => { if (e.target === $("qcModal")) $("qcModal").classList.add("hidden"); };
+$("qcGo").onclick = async () => {
+  const bad = qcSegs.find(x => !(x.e > x.s));
+  if (bad) { alert(t("up.qc_bad_seg")); return; }
+  $("qcGo").disabled = true;
+  try {
+    await api("POST", `/api/pipeline/jobs/${qcJobId}/confirm-oob`,
+              { segments: qcSegs.map(x => [x.s, x.e]) });
+    $("qcModal").classList.add("hidden");
+    await loadJobs();
+  } catch (e) { alert(t("up.qc_fail", e.message)); }
+  $("qcGo").disabled = false;
+};
+
+// ================= 輪詢與開機 =================
+let lastSig = "";
+setInterval(async () => {
+  if (document.hidden) return;
+  const hadActive = jobList.some(j => ["queued", "running", "awaiting_qc"].includes(j.status));
+  if (!hadActive) return;
+  await loadJobs();
+  const sig = jobList.map(j => `${j.job_id}:${j.status}`).join("|");
+  if (sig !== lastSig) {           // 狀態變化（如 done：資料夾已歸檔）→ 同步掃描與系列數
+    lastSig = sig;
+    loadScan(); loadSeries(); loadReclaim();
+  }
+}, 3000);
+
+(async function () {
+  try { projectsList = await api("GET", "/api/projects"); } catch {}
+  await loadSeries();
+  await Promise.all([loadScan(), loadJobs(), loadReclaim()]);
+  lastSig = jobList.map(j => `${j.job_id}:${j.status}`).join("|");
+})();
+</script>
+</body>
+</html>

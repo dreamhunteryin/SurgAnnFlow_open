@@ -1,0 +1,62 @@
+# SurgAnnFlow Annotator — systemd service unit 【範本】
+#
+# 什麼是 systemd unit：Linux 開機後負責「把服務叫起來、掛掉自動重開」的設定檔。
+#
+# ★ 這是範本，不要直接複製本檔安裝。由下列指令渲染成本機版本：
+#     surgann setup --systemd
+#   → 產生 deploy/systemd/generated/surgannflow-annotator.service（已 gitignore），
+#     並印出要用 sudo 執行的安裝指令（程式本身不跑 sudo）。
+#
+# 佔位符（格式為「@名稱@」，setup 自動填入）：
+#   USER / GROUP   執行服務的使用者與主要群組（= 跑 setup 的人）
+#   APP_DIR        專案目錄（clone 下來的 repo 根目錄）
+#   VENV           安裝了 surgann 的 Python venv（ExecStart 用 VENV/bin/surgann）
+#   DATA_DIR       data 根（deploy/.env 的 SURGANN_DATA_DIR；僅供註解對照）
+#   MOUNTS         專案目錄與 data 根所在的獨立掛載點（不在根分割區才有；都在 / 則整行省略）
+#   TZ             deploy/.env 的 TZ（留空 → 整行省略，用系統時區）
+#
+# port 不寫在這裡：surgann annotate 會自己讀 deploy/.env 的 ANNOTATOR_PORT；
+# data 根同理由 config 讀 .env 的 SURGANN_DATA_DIR。改 port/標註者名稱只要改 .env 再 restart；
+# 改 TZ 或把 data 根換到另一顆磁碟時，需重跑 surgann setup --systemd 並依指示重裝 unit。
+# 本 unit 刻意不用 EnvironmentFile=deploy/.env：.env 裡 TZ= 留空時，systemd 會設成空字串，
+# 而空的 TZ 在 Linux 等於 UTC（不是系統時區），會讓時間錯位。
+
+[Unit]
+Description=SurgAnnFlow Annotator (surgann annotate)
+Documentation=file://@APP_DIR@/README.md
+After=network.target
+
+# 關鍵防呆：資料磁碟沒掛好就不啟動，也不會在空掛載點下自行建目錄。
+# （開機時若資料磁碟晚一步掛載，掛載點可能變名（例如 /media/<user>/Disk → Disk1），
+#   服務就會讀到空目錄或錯的路徑；這行讓 systemd 等磁碟掛好才啟動。）
+# data 根：@DATA_DIR@
+RequiresMountsFor=@MOUNTS@
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@APP_DIR@
+ExecStart=@VENV@/bin/surgann annotate
+Environment=TZ=@TZ@
+
+# 停止時送 SIGINT（等同終端機的 Ctrl+C），讓 uvicorn 收乾淨再退出。
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+# 崩潰才重啟；使用者手動 stop 不會被自動拉回。
+Restart=on-failure
+RestartSec=5
+
+# 日誌走 journald（journalctl -u surgannflow-annotator 看），不另外導檔案。
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=surgannflow-annotator
+Environment=PYTHONUNBUFFERED=1
+
+# 基本收斂：不得提權；/usr /boot /etc 對本服務唯讀（平台只寫專案目錄與 data 根）。
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

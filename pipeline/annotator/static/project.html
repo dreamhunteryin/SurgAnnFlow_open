@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title data-i18n="proj.title">SurgAnnFlow — 專案</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css?v=20261102-1">
+<script src="i18n.js?v=20261102-1"></script>
+</head>
+<body class="project-page">
+<header id="topbar">
+  <a class="topbar-link" href="./" data-i18n="nav.back_projects">← 專案</a>
+  <span class="brand">SurgAnnFlow</span>
+  <span id="projName"></span>
+  <span id="projType" class="badge ptype"></span>
+  <code id="projCode" class="pid-code" title="專案編碼（固定識別碼，匯出/CLI 以此指定專案）" data-i18n-title="proj.code_title"></code>
+  <span id="projGroup" class="dim"></span>
+  <span class="spacer"></span>
+  <a class="topbar-link" href="guide.html" target="_blank" rel="noopener" data-i18n="nav.guide">📖 使用手冊</a>
+  <button class="topbar-link" id="langToggle" type="button"></button>
+  <span id="projAnnotator" class="dim"></span>
+</header>
+
+<div id="projMain">
+  <nav id="projNav">
+    <button class="pnav active" data-view="videos" data-i18n="proj.nav_videos">🎬 影片</button>
+    <button class="pnav" data-view="upload" data-i18n="proj.nav_upload">📥 上傳資料</button>
+    <button class="pnav" data-view="labels" data-i18n="proj.nav_labels">🏷 類別</button>
+    <button class="pnav" data-view="download" data-i18n="proj.nav_download">📦 下載資料集</button>
+  </nav>
+
+  <main id="projContent">
+    <!-- 影片（此專案的播放清單：影片本體只入庫一次，各專案引用不複製） -->
+    <section id="view-videos" class="view">
+      <h2><span data-i18n="proj.h_videos">影片</span> <span id="vidCount" class="dim"></span>
+        <button id="addVidBtn" class="primary" style="margin-left:12px" data-i18n="proj.add_video">＋ 加入影片</button>
+      </h2>
+      <div id="vidEmpty" class="panel-note hidden" data-i18n="proj.vid_empty">
+        此專案還沒有影片 — 按「＋ 加入影片」從影片庫挑選已入庫的影片，
+        或到「📥 上傳資料」把硬碟上的原始影片入庫到這個專案。
+      </div>
+      <div id="vidGrid" class="card-grid"></div>
+    </section>
+
+    <!-- 上傳（掃描後端硬碟；單檔快速入庫） -->
+    <section id="view-upload" class="view hidden">
+      <h2 data-i18n="proj.h_upload">上傳資料（掃描後端硬碟）</h2>
+      <div class="panel-note" data-i18n-html="proj.upload_note">
+        <b>單一影片檔</b>快速入庫：檔案先放到伺服器的 <code>data/raw_videos/</code>（原始檔唯讀、不會被修改），
+        選擇系列後按「入庫」——會轉成標準化 25fps 影片、依系列<b>自動配號</b>（如 <code>ABCD_0004</code>）並加入此專案（大檔需數分鐘）。<br>
+        <b>病人資料夾</b>（多段錄影合併＋體外畫面去識別化）請改用
+        <a class="dl-link" href="upload.html">📥 影片入庫</a> 頁的處理佇列。
+      </div>
+      <div class="dl-row">
+        <label class="dim" data-i18n="proj.ingest_to_series">入庫到系列：</label>
+        <select id="rawSeries"><option value="" data-i18n="proj.select_series">— 選擇系列 —</option></select>
+        <span class="dim" data-i18n-html="proj.series_created_at">（系列在 <a class="dl-link" href="upload.html#series">影片入庫</a> 頁建立）</span>
+      </div>
+      <table class="ptable">
+        <thead><tr><th data-i18n="proj.th_filename">檔名</th><th data-i18n="proj.th_size">大小</th><th>video_id</th><th data-i18n="proj.th_status">狀態</th></tr></thead>
+        <tbody id="rawBody"></tbody>
+      </table>
+    </section>
+
+    <!-- 類別（taxonomy）管理 -->
+    <section id="view-labels" class="view hidden">
+      <h2 data-i18n="proj.h_labels">類別（taxonomy）</h2>
+      <div class="panel-note" data-i18n-html="proj.labels_note">
+        每個專案有獨立的類別清單，隨時可增改。<b>改名</b>會同步更新此專案內既有標註；
+        <b>刪除</b>已被使用的類別會先跳出確認，確認後連同其標註一併刪除。
+      </div>
+      <div class="dl-row">
+        <label class="dim" data-i18n="proj.import_from">從其他專案匯入類別：</label>
+        <select id="lmImportSel"><option value="" data-i18n="proj.select_src_project">— 選擇來源專案 —</option></select>
+        <button id="lmImportGo" data-i18n="proj.import_go">📥 匯入（不複製標註）</button>
+        <span id="lmImportStatus" class="dim"></span>
+      </div>
+      <div id="labelsHost"></div>
+    </section>
+
+    <!-- 下載（互動式資料集下載 + 其他匯出） -->
+    <section id="view-download" class="view hidden">
+      <h2 data-i18n="proj.h_download">下載資料集</h2>
+      <div class="panel-note" data-i18n-html="proj.dl_note">
+        自訂內容 / 範圍 / 類別後直接下載 zip。匯出範圍＝<b>本專案</b>（編碼 <code id="expCode"></code>）。
+        影格配對 / clip 配對請用 CLI：<code>surgann export-dataset -f frame-pairs -P <span class="expCodeCli"></span></code>。
+      </div>
+
+      <div class="exp-card">
+        <div class="exp-row"><label data-i18n="proj.f_format">格式</label>
+          <select id="fexFmt">
+            <option value="mosaic" data-i18n="proj.fmt_mosaic">MOSaiC JSON（temporal + spatial）</option>
+            <option value="coco" data-i18n="proj.fmt_coco">COCO（物件偵測/分割）</option>
+            <option value="yolo" data-i18n="proj.fmt_yolo">YOLO（物件偵測/分割）</option>
+          </select></div>
+        <div class="exp-row"><label data-i18n="proj.f_content">內容</label>
+          <label class="rlabel"><input type="radio" name="fexContent" value="full" checked> <span data-i18n="proj.content_full">label + images</span></label>
+          <label class="rlabel"><input type="radio" name="fexContent" value="label"> <span data-i18n="proj.content_label">label only（不含影像）</span></label></div>
+        <div class="exp-row"><label data-i18n="proj.f_scope">範圍</label>
+          <span class="rgroup">
+            <label class="rlabel"><input type="radio" name="fexScope" value="all" checked> <span data-i18n="proj.scope_all">全部</span></label>
+            <label class="rlabel"><input type="radio" name="fexScope" value="spatial"> <span data-i18n="proj.scope_spatial">只要 spatial</span></label>
+            <label class="rlabel"><input type="radio" name="fexScope" value="temporal"> <span data-i18n="proj.scope_temporal">只要 temporal</span></label>
+            <label class="rlabel"><input type="radio" name="fexScope" value="gate"> <span data-i18n="proj.scope_gate">以 temporal 規則篩選 spatial</span></label>
+          </span></div>
+        <div class="exp-row hidden" id="fexGateRow"><label></label>
+          <div>
+            <div class="dim" style="margin-bottom:4px" data-i18n="proj.gate_hint">只匯出落在勾選之 temporal label 標註時間範圍內的 spatial 標註（可複選＝聯集）：</div>
+            <div id="fexGate"></div>
+          </div></div>
+        <div class="exp-row exp-top"><label data-i18n="proj.f_labels">類別</label>
+          <div class="exp-labels-wrap">
+            <div class="dl-row" style="margin:0 0 6px">
+              <button id="fexAll" type="button" data-i18n="proj.sel_all">全選</button>
+              <button id="fexNone" type="button" data-i18n="proj.sel_none">全不選</button>
+              <span class="dim" data-i18n="proj.labels_hint">勾選要匯出的類別（預設全選）</span>
+            </div>
+            <div id="fexLabels"></div>
+          </div></div>
+        <div class="exp-row"><label></label>
+          <button class="primary" id="fexGo" data-i18n="proj.dl_go">⬇ 下載資料集（zip）</button>
+          <span id="fexStatus" class="dim"></span></div>
+        <div id="fexResult"></div>
+      </div>
+
+      <h2 style="margin-top:26px" data-i18n="proj.h_other_export">其他匯出（原有流程）</h2>
+      <div class="panel-note" data-i18n-html="proj.other_note">
+        <b>MOSaiC / COCO / YOLO</b>＝資料集匯出（標註＋對應影像，不套用上方篩選）；
+        <b>temporal</b>＝時間軸標註 CSV＋JSON 快照、<b>spatial</b>＝空間標註 COCO＋抽幀影像。
+      </div>
+      <div class="dl-row">
+        <select id="expKind">
+          <option value="mosaic" data-i18n="proj.exp_mosaic">MOSaiC JSON + 影像（temporal + spatial 全標註）</option>
+          <option value="coco" data-i18n="proj.exp_coco">COCO + 影像（物件偵測/分割）</option>
+          <option value="yolo" data-i18n="proj.exp_yolo">YOLO + 影像（物件偵測/分割）</option>
+          <option value="temporal" data-i18n="proj.exp_temporal">temporal（時間軸標註 CSV＋JSON）</option>
+          <option value="spatial" data-i18n="proj.exp_spatial">spatial（空間標註 COCO＋抽幀影像）</option>
+        </select>
+        <button class="primary" id="expBtn" data-i18n="proj.export">匯出</button>
+        <span id="expStatus" class="dim"></span>
+      </div>
+      <div id="expResult"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ＋加入影片：從影片庫挑已入庫影片加進本專案（不複製檔案，只是引用） -->
+<div id="addModal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-head"><h2 data-i18n="proj.add_modal_title">加入影片到此專案</h2>
+      <button class="modal-close" id="addClose">✕</button></div>
+    <div class="modal-pad">
+      <div class="panel-note" data-i18n-html="proj.add_modal_note">
+        列出影片庫中<b>還不在本專案</b>的已入庫影片。加入只是把影片放進本專案清單
+        （同一支影片可同時屬於多個專案，各專案的標註互相獨立）。
+      </div>
+      <div class="dl-row">
+        <label class="dim" data-i18n="proj.import_series">整系列匯入：</label>
+        <select id="addSeriesSel"></select>
+        <button id="addSeriesGo" data-i18n="proj.import_series_go">📚 整系列匯入</button>
+        <span id="addSeriesStatus" class="dim"></span>
+      </div>
+      <table class="ptable">
+        <thead><tr><th data-i18n="proj.th_video">影片</th><th data-i18n="proj.th_series">系列</th><th data-i18n="proj.th_duration">時長</th><th></th></tr></thead>
+        <tbody id="addBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const PID = new URLSearchParams(location.search).get("p") || "default";
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method, headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch {} throw new Error(`${r.status} ${d}`); }
+  return r.json();
+}
+function fmtDur(sec) {
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+function fmtSize(b) {
+  if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1) + " GB";
+  if (b >= 1 << 20) return (b / (1 << 20)).toFixed(1) + " MB";
+  return Math.round(b / 1024) + " KB";
+}
+
+// ---- 系列（series 表制，videos.series 存 series_id）----
+let seriesList = [];
+const seriesName = (sid) => (seriesList.find(s => s.series_id === sid) || {}).name || sid;
+async function loadSeriesList() {
+  try { seriesList = await api("GET", "/api/series"); } catch { seriesList = []; }
+}
+
+// ---- 左 nav 視圖切換（#hash 可直達，如 project.html?p=default#upload）----
+function showView(view) {
+  if (!document.getElementById(`view-${view}`)) view = "videos";
+  document.querySelectorAll(".pnav").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v =>
+    v.classList.toggle("hidden", v.id !== `view-${view}`));
+  if (view === "upload") renderRaw();
+  if (view === "labels") renderLabels();
+  if (view === "download") renderDownloadForm();
+}
+for (const btn of document.querySelectorAll(".pnav")) {
+  btn.onclick = () => { location.hash = btn.dataset.view; showView(btn.dataset.view); };
+}
+window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
+
+// ---- 影片網格（本專案播放清單；標註筆數＝本專案的）----
+async function renderVideos() {
+  let vids = [];
+  try { vids = await api("GET", `/api/projects/${encodeURIComponent(PID)}/videos`); }
+  catch (e) { $("vidGrid").textContent = e.message; return; }
+  $("vidCount").textContent = t("proj.vid_count", vids.length);
+  $("vidEmpty").classList.toggle("hidden", vids.length > 0);
+  const grid = $("vidGrid");
+  grid.innerHTML = "";
+  for (const v of vids) {
+    const card = document.createElement("a");
+    card.className = "vcard";
+    card.href = `app.html?v=${encodeURIComponent(v.video_id)}&p=${encodeURIComponent(PID)}`;
+    const series = v.series ? `<span class="badge series" title="${v.series}">${seriesName(v.series)}</span>` : "";
+    card.innerHTML =
+      `<div class="thumb"><img loading="lazy" src="${v.thumb_url}" alt="${v.video_id}"></div>` +
+      `<div class="vinfo">` +
+      `<div class="vtitle">${v.video_id}${series}<span class="badge ${v.status}">${v.status}</span></div>` +
+      `<div class="vmeta dim">${fmtDur(v.duration_sec)} ・ ${v.width}×${v.height} ・ ${v.fps}fps</div>` +
+      `<div class="vmeta">${t("proj.vmeta_anns", v.n_annotations)}</div>` +
+      `</div>`;
+    const rm = document.createElement("button");
+    rm.className = "vremove"; rm.textContent = t("proj.remove_from");
+    rm.title = t("proj.remove_title");
+    rm.onclick = (e) => { e.preventDefault(); e.stopPropagation(); removeVideo(v.video_id, v.n_annotations); };
+    card.appendChild(rm);
+    grid.appendChild(card);
+  }
+}
+
+// 移出專案：本專案有標註 → 後端 409 → 警告 modal 確認後帶 confirm=1 重試
+async function removeVideo(vid, nAnns) {
+  if (!nAnns && !confirm(t("proj.confirm_remove", vid))) return;
+  const del = (c) => fetch(
+    `/api/projects/${encodeURIComponent(PID)}/videos/${encodeURIComponent(vid)}` +
+    (c ? "?confirm=1" : ""), { method: "DELETE" });
+  try {
+    let r = await del(false);
+    if (r.status === 409) {
+      let n = nAnns;
+      try { const d = (await r.json()).detail; if (d && d.n_annotations != null) n = d.n_annotations; } catch {}
+      if (!confirm(t("proj.confirm_remove_anns", vid, n))) return;
+      r = await del(true);
+    }
+    if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch {} throw new Error(`${r.status} ${JSON.stringify(d)}`); }
+    const res = await r.json();
+    if (res.deleted_annotations) alert(t("proj.removed_with_anns", vid, res.deleted_annotations));
+    renderVideos();
+  } catch (e) { alert(t("proj.remove_fail", e.message)); }
+}
+
+// ---- ＋加入影片（影片庫中不在本專案的已入庫影片；含整系列匯入）----
+$("addVidBtn").onclick = () => { $("addModal").classList.remove("hidden"); renderAddModal(); };
+$("addClose").onclick = () => $("addModal").classList.add("hidden");
+$("addModal").onclick = (e) => { if (e.target === $("addModal")) $("addModal").classList.add("hidden"); };
+async function renderAddModal() {
+  $("addSeriesStatus").textContent = "";
+  let vids = [];
+  try { [vids] = await Promise.all([api("GET", "/api/videos"), loadSeriesList()]); }
+  catch (e) { $("addBody").innerHTML = `<tr><td colspan="4">${e.message}</td></tr>`; return; }
+  const withVids = seriesList.filter(s => s.n_videos > 0);
+  $("addSeriesSel").innerHTML = withVids.length
+    ? withVids.map(s => `<option value="${s.series_id}">${t("proj.series_opt", s.name.replace(/</g, "&lt;"), s.n_videos)}</option>`).join("")
+    : `<option value="">${t("proj.no_series_opt")}</option>`;
+  const avail = vids.filter(v => !(v.projects || []).includes(PID));
+  const body = $("addBody");
+  body.innerHTML = avail.length ? "" :
+    `<tr><td colspan="4" class="dim">${t("proj.all_in_project")}</td></tr>`;
+  for (const v of avail) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td><code>${v.video_id}</code></td>` +
+      `<td>${v.series ? `<span class="badge series" title="${v.series}">${seriesName(v.series)}</span>` : `<span class="dim">—</span>`}</td>` +
+      `<td class="dim">${fmtDur(v.duration_sec)}</td><td></td>`;
+    const btn = document.createElement("button");
+    btn.className = "primary"; btn.textContent = t("proj.add");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        await api("POST", `/api/projects/${encodeURIComponent(PID)}/videos`, { video_id: v.video_id });
+        renderAddModal(); renderVideos();
+      } catch (e) { alert(t("proj.add_fail", e.message)); btn.disabled = false; }
+    };
+    tr.lastElementChild.appendChild(btn);
+    body.appendChild(tr);
+  }
+}
+$("addSeriesGo").onclick = async () => {
+  const s = $("addSeriesSel").value;
+  if (!s) { alert(t("proj.no_series_alert")); return; }
+  $("addSeriesGo").disabled = true;
+  try {
+    const res = await api("POST", `/api/projects/${encodeURIComponent(PID)}/videos/import-series`, { series: s });
+    await renderAddModal(); renderVideos();
+    $("addSeriesStatus").textContent = t("proj.import_series_ok", seriesName(s), res.n_added, res.n_total);
+  } catch (e) { alert(t("proj.import_series_fail", e.message)); }
+  $("addSeriesGo").disabled = false;
+};
+
+// ---- raw 掃描與入庫 ----
+let rawTimer = null;
+async function renderRaw() {
+  let rows = [];
+  try {
+    [rows] = await Promise.all([
+      api("GET", `/api/raw-scan?project=${encodeURIComponent(PID)}`), loadSeriesList()]);
+  } catch (e) { $("rawBody").innerHTML = `<tr><td colspan="4">${e.message}</td></tr>`; return; }
+  const sel = $("rawSeries"), prevSel = sel.value;
+  sel.innerHTML = `<option value="">${t("proj.select_series")}</option>` + seriesList.map(s =>
+    `<option value="${s.series_id}">${s.name.replace(/</g, "&lt;")}（${s.series_id}）</option>`).join("");
+  if ([...sel.options].some(o => o.value === prevSel)) sel.value = prevSel;
+  const body = $("rawBody");
+  body.innerHTML = "";
+  let anyRunning = false;
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    const job = r.job;
+    let idCell, stCell;
+    if (r.ingested && r.in_project) {
+      idCell = `<code>${r.video_id}</code>`;
+      stCell = `<span class="ok-mark">${t("proj.in_this_project")}</span>`;
+    } else if (r.ingested) {
+      // 已入庫但不在本專案 → 一鍵加入清單（不重新轉檔）
+      idCell = `<code>${r.video_id}</code>`;
+      stCell = `<button data-addvid="${r.video_id}">${t("proj.add_this_project")}</button>` +
+               `<span class="dim">${t("proj.already_ingested")}</span>`;
+    } else if (job && job.status === "running") {
+      anyRunning = true;
+      idCell = `<code>${job.video_id}</code>`;
+      stCell = `<span class="dim">${t("proj.ingesting")}</span>`;
+    } else {
+      idCell = `<span class="dim">${t("proj.auto_id")}</span>`;
+      const err = job && job.status === "error"
+        ? `<div class="err-mark">✗ ${job.error}</div>` : "";
+      stCell = `<button class="primary" data-ingest="${r.filename}">${t("proj.ingest")}</button>${err}`;
+    }
+    tr.innerHTML = `<td>${r.filename}</td><td class="dim">${fmtSize(r.size)}</td>` +
+                   `<td>${idCell}</td><td>${stCell}</td>`;
+    body.appendChild(tr);
+  }
+  for (const btn of body.querySelectorAll("button[data-addvid]")) {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        await api("POST", `/api/projects/${encodeURIComponent(PID)}/videos`,
+                  { video_id: btn.dataset.addvid });
+        renderRaw(); renderVideos();
+      } catch (e) { alert(t("proj.add_fail", e.message)); btn.disabled = false; }
+    };
+  }
+  for (const btn of body.querySelectorAll("button[data-ingest]")) {
+    btn.onclick = async () => {
+      const filename = btn.dataset.ingest;
+      const series_id = $("rawSeries").value;
+      if (!series_id) { alert(t("proj.need_series")); return; }
+      btn.disabled = true;
+      try {
+        await api("POST", "/api/ingest", { filename, series_id, project_id: PID });
+        renderRaw();
+      } catch (e) { alert(t("proj.ingest_fail", e.message)); btn.disabled = false; }
+    };
+  }
+  clearTimeout(rawTimer);
+  if (anyRunning) rawTimer = setTimeout(async () => {
+    await renderRaw();
+    renderVideos();   // 入庫完成後影片網格會多出新卡片
+  }, 3000);
+}
+
+// ---- 類別（taxonomy）管理 ----
+const LM_LAYERS = [
+  ["phase", "proj.layer_phase"], ["action", "proj.layer_action"],
+  ["event", "proj.layer_event"], ["spatial", "proj.layer_spatial"],
+];
+const DEF_COLOR = "#4dc9b0";
+// 「從其他專案匯入類別」下拉（合併語意：同層同名跳過；不複製標註）
+async function renderImportSel() {
+  let projects = [];
+  try { projects = await api("GET", "/api/projects"); } catch { return; }
+  const prev = $("lmImportSel").value;
+  $("lmImportSel").innerHTML = `<option value="">${t("proj.select_src_project")}</option>` +
+    projects.filter(p => p.project_id !== PID)
+      .map(p => `<option value="${p.project_id}">${p.name.replace(/</g, "&lt;")}（${p.project_id}）</option>`).join("");
+  if ([...$("lmImportSel").options].some(o => o.value === prev)) $("lmImportSel").value = prev;
+}
+$("lmImportGo").onclick = async () => {
+  const from = $("lmImportSel").value;
+  if (!from) { alert(t("proj.select_src_first")); return; }
+  $("lmImportGo").disabled = true;
+  $("lmImportStatus").textContent = t("proj.importing");
+  try {
+    const res = await api("POST", `/api/projects/${encodeURIComponent(PID)}/labels/import`, { from_project: from });
+    $("lmImportStatus").textContent =
+      t("proj.import_ok", res.imported, res.skipped) +
+      (res.triplet_copied ? t("proj.import_triplet") : "");
+    fexLoaded = false;   // 下載分頁的類別勾選清單需重載
+    renderLabels();
+  } catch (e) { $("lmImportStatus").textContent = t("proj.import_fail", e.message); }
+  $("lmImportGo").disabled = false;
+};
+async function renderLabels() {
+  renderImportSel();
+  const host = $("labelsHost");
+  let rows = [];
+  try { rows = await api("GET", `/api/projects/${encodeURIComponent(PID)}/labels`); }
+  catch (e) { host.textContent = e.message; return; }
+  host.innerHTML = "";
+  for (const [layer, title] of LM_LAYERS) {
+    const list = rows.filter(r => r.layer === layer);
+    const h = document.createElement("h3");
+    h.className = "lm-layer";
+    h.innerHTML = `${t(title)} <span class="dim">（${list.length}）</span>`;
+    host.appendChild(h);
+    const tb = document.createElement("table");
+    tb.className = "lm-table";
+    for (const r of list) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td><input type="color" value="${r.color || DEF_COLOR}" title="${t("proj.color_title")}"></td>` +
+        `<td><input type="text" value="${r.name.replace(/"/g, "&quot;")}"></td>` +
+        `<td class="lm-use">${r.in_use ? t("proj.in_use", r.in_use) : t("proj.not_used")}</td>` +
+        `<td><button data-save>${t("proj.save")}</button></td><td><button data-del>${t("proj.del")}</button></td>`;
+      const [colorIn, nameIn] = tr.querySelectorAll("input");
+      tr.querySelector("[data-save]").onclick = async () => {
+        const name = nameIn.value.trim();
+        if (!name) { alert(t("proj.name_empty")); return; }
+        try {
+          const res = await api("PATCH", `/api/labels/${r.label_id}`,
+                                { name, color: colorIn.value });
+          if (res.renamed_annotations)
+            alert(t("proj.renamed_anns", res.renamed_annotations));
+          renderLabels();
+        } catch (e) { alert(t("proj.save_fail", e.message)); }
+      };
+      tr.querySelector("[data-del]").onclick = async () => {
+        try { await api("DELETE", `/api/labels/${r.label_id}`); renderLabels(); }
+        catch (e) {
+          if (e.message.startsWith("409")) {
+            const msg = e.message.replace(/^409\s*/, "");
+            if (confirm(t("proj.confirm_del_label", msg))) {
+              try { await api("DELETE", `/api/labels/${r.label_id}?force=true`); renderLabels(); }
+              catch (e2) { alert(t("proj.del_fail", e2.message)); }
+            }
+          } else alert(t("proj.del_fail", e.message));
+        }
+      };
+      tb.appendChild(tr);
+    }
+    // 新增列
+    const tr = document.createElement("tr");
+    tr.className = "lm-new";
+    tr.innerHTML =
+      `<td><input type="color" value="${DEF_COLOR}" title="${t("proj.color_title")}"></td>` +
+      `<td><input type="text" placeholder="${t("proj.new_label_ph")}"></td>` +
+      `<td class="lm-use"></td><td><button data-add class="primary">${t("proj.add_label")}</button></td><td></td>`;
+    const [cIn, nIn] = tr.querySelectorAll("input");
+    const addFn = async () => {
+      const name = nIn.value.trim();
+      if (!name) return;
+      try {
+        await api("POST", "/api/labels",
+                  { layer, name, color: cIn.value, project_id: PID });
+        renderLabels();
+      } catch (e) { alert(t("proj.add_label_fail", e.message)); }
+    };
+    tr.querySelector("[data-add]").onclick = addFn;
+    nIn.addEventListener("keydown", (e) => { if (e.key === "Enter") addFn(); });
+    tb.appendChild(tr);
+    host.appendChild(tb);
+  }
+}
+
+// ---- 互動式資料集下載（內容/範圍/類別/格式 → POST /api/projects/{id}/export，直接回 zip）----
+const TEMPORAL_LAYERS = ["phase", "action", "event", "triplet"];
+let fexLoaded = false;
+async function renderDownloadForm() {
+  if (fexLoaded) return;                    // taxonomy 只載一次；重進分頁保留勾選狀態
+  let rows = [];
+  try { rows = await api("GET", `/api/projects/${encodeURIComponent(PID)}/labels`); }
+  catch (e) { $("fexLabels").textContent = e.message; return; }
+  fexLoaded = true;
+  // temporal gate 複選（phase/action/event/triplet 的 label；勾多個＝聯集）
+  const gates = rows.filter(r => TEMPORAL_LAYERS.includes(r.layer));
+  const gh = $("fexGate");
+  gh.innerHTML = gates.length ? "" : `<span class="dim">${t("proj.no_temporal_label")}</span>`;
+  for (const r of gates) {
+    const lb = document.createElement("label");
+    lb.className = "rlabel fex-cb";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = r.name; cb.dataset.layer = r.layer;
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(` ${r.layer} / ${r.name}`));
+    gh.appendChild(lb);
+  }
+  // label 勾選清單（依 layer 分組，預設全選）
+  const host = $("fexLabels");
+  host.innerHTML = "";
+  for (const [layer, title] of [["phase", "phase"], ["action", "action"], ["event", "event"], ["triplet", "triplet"], ["spatial", "spatial"]]) {
+    const list = rows.filter(r => r.layer === layer);
+    if (!list.length) continue;
+    const grp = document.createElement("div");
+    grp.className = "fex-grp";
+    grp.innerHTML = `<div class="fex-grp-title dim">${title}</div>`;
+    for (const r of list) {
+      const lb = document.createElement("label");
+      lb.className = "rlabel fex-cb";
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = true; cb.value = r.name; cb.dataset.layer = r.layer;
+      lb.appendChild(cb); lb.appendChild(document.createTextNode(` ${r.name}`));
+      grp.appendChild(lb);
+    }
+    host.appendChild(grp);
+  }
+  if (!host.children.length) host.innerHTML = `<span class="dim">${t("proj.no_labels")}</span>`;
+}
+$("fexAll").onclick = () => document.querySelectorAll("#fexLabels input[type=checkbox]").forEach(c => { c.checked = true; });
+$("fexNone").onclick = () => document.querySelectorAll("#fexLabels input[type=checkbox]").forEach(c => { c.checked = false; });
+for (const r of document.querySelectorAll('input[name="fexScope"]'))
+  r.onchange = () => $("fexGateRow").classList.toggle("hidden",
+    document.querySelector('input[name="fexScope"]:checked').value !== "gate");
+
+$("fexGo").onclick = async () => {
+  const scopeSel = document.querySelector('input[name="fexScope"]:checked').value;
+  const gateSel = [...document.querySelectorAll("#fexGate input[type=checkbox]:checked")].map(c => c.value);
+  const body = {
+    fmt: $("fexFmt").value,
+    include_images: document.querySelector('input[name="fexContent"]:checked').value === "full",
+    scope: scopeSel === "gate" ? "spatial" : scopeSel,
+    temporal_gate: scopeSel === "gate" ? gateSel : null,   // 複選清單＝聯集
+  };
+  if (scopeSel === "gate" && !gateSel.length) { alert(t("proj.gate_need")); return; }
+  const boxes = [...document.querySelectorAll("#fexLabels input[type=checkbox]")];
+  const checked = boxes.filter(c => c.checked).map(c => c.value);
+  if (boxes.length && !checked.length) { alert(t("proj.need_one_label")); return; }
+  body.include_labels = (!boxes.length || checked.length === boxes.length) ? null : checked;
+
+  $("fexGo").disabled = true;
+  $("fexStatus").textContent = t("proj.exporting_fex", body.include_images);
+  $("fexResult").innerHTML = "";
+  try {
+    const r = await fetch(`/api/projects/${encodeURIComponent(PID)}/export`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { let d = ""; try { d = (await r.json()).detail || ""; } catch {} throw new Error(`${r.status} ${d}`); }
+    // 串流 zip → 觸發瀏覽器下載
+    const blob = await r.blob();
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^\";]+)"?/i);
+    const fname = m ? decodeURIComponent(m[1]) : `dataset_${PID}_${body.fmt}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fname; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    $("fexStatus").textContent = "";
+    $("fexResult").innerHTML = `<div class="dl-row">${t("proj.downloaded", fname, fmtSize(blob.size))}</div>`;
+  } catch (e) {
+    $("fexStatus").textContent = "";
+    $("fexResult").innerHTML = `<div class="err-mark">${t("proj.err_mark", e.message)}</div>`;
+  }
+  $("fexGo").disabled = false;
+};
+
+// ---- 匯出與下載 ----
+$("expBtn").onclick = async () => {
+  const kind = $("expKind").value;
+  const isDataset = ["mosaic", "coco", "yolo"].includes(kind);
+  $("expBtn").disabled = true;
+  $("expStatus").textContent = isDataset
+    ? t("proj.exporting_dataset")
+    : t("proj.exporting_light");
+  $("expResult").innerHTML = "";
+  try {
+    const res = await api("POST", "/api/export", { kind, project_id: PID });
+    $("expStatus").textContent = "";
+    const stats = res.n_images != null
+      ? ` <span class="dim">${t("proj.export_stats", res.n_videos, res.n_images, res.n_annotations)}</span>`
+      : "";
+    $("expResult").innerHTML =
+      `<div class="dl-row">${t("proj.export_ok", res.run_id, stats, res.download_url)}</div>`;
+  } catch (e) {
+    $("expStatus").textContent = "";
+    $("expResult").innerHTML = `<div class="err-mark">${t("proj.err_mark", e.message)}</div>`;
+  }
+  $("expBtn").disabled = false;
+};
+
+// ---- boot ----
+(async function () {
+  try {
+    const cfg = await api("GET", `/api/config?project=${encodeURIComponent(PID)}`);
+    $("projAnnotator").textContent = t("topbar.annotator", cfg.annotator);
+  } catch {}
+  try {
+    const projects = await api("GET", "/api/projects");
+    const p = projects.find(x => x.project_id === PID);
+    if (!p) { document.title = t("proj.not_exist_title"); $("projName").textContent = t("proj.not_exist", PID); return; }
+    document.title = t("proj.title_named", p.name);
+    $("projName").textContent = p.name;
+    $("projType").textContent = p.project_type;
+    $("projCode").textContent = p.project_id;
+    $("projGroup").textContent = p.annotation_group || "";
+    $("expCode").textContent = p.project_id;
+    document.querySelectorAll(".expCodeCli").forEach(el => el.textContent = p.project_id);
+  } catch (e) {}
+  await loadSeriesList();
+  renderVideos();
+  if (location.hash) showView(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

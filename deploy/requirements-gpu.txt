@@ -1,0 +1,32 @@
+# 安裝配方：有 NVIDIA GPU。在專案根目錄執行：
+#   python3 -m venv .venv && . .venv/bin/activate
+#   pip install -U pip
+#   pip install -e . -r deploy/requirements-gpu.txt
+# 預期：Successfully installed ... onnxruntime-gpu-1.22.0 ... surgann-0.1.0；
+#       之後 `surgann doctor` 的「onnxruntime providers」列出 CUDAExecutionProvider 且「CUDA session 實測 OK」。
+#
+# 共用相依寫在 pyproject.toml，本檔只補 GPU 推論部分。不需系統另裝 CUDA toolkit：
+# 下列 nvidia-* wheel 自帶 CUDA/cuDNN 函式庫，SAM 服務啟動時會預載（pipeline/sam_assist/service.py）。
+# 與 onnxruntime（CPU 版）互斥：同一個 venv 只能裝其中一個。
+#
+# ── 本檔＝實測鎖版組合：GTX 1080 Ti（Pascal, sm_61）＋ NVIDIA driver 535（CUDA 12.2）──
+# 勿任意升級：
+#   * onnxruntime-gpu 1.27+ 的 wheel 連結 CUDA 13，CUDA 13 已移除 Pascal，driver 535 也不支援；
+#   * cuDNN 9.25 / CUDA 12.9 wheel 用到 driver 535 沒有的 API（CUDNN_STATUS_EXECUTION_FAILED_CUDART）。
+#
+# ── 其他顯卡世代（未在本平台實測，僅供起點；改完務必跑 surgann doctor 看 CUDA 實測）──
+#   先查：nvidia-smi --query-gpu=name,driver_version,compute_cap --format=csv
+#   * Pascal（GTX 10xx, compute 6.x）：用本檔原樣。
+#   * Volta/Turing/Ampere/Ada（compute 7.0–8.9；RTX 20/30/40、A100…）＋ driver ≥ 535：
+#       本檔原樣通常可用；driver ≥ 550 者可改用較新組合，例如只寫一行
+#       onnxruntime-gpu[cuda,cudnn]>=1.21,<1.27   （1.21 起有此 extras，由 pip 自動配對 CUDA 12 / cuDNN 9 wheel）
+#   * Blackwell（RTX 50xx, compute 12.x）：需 driver ≥ 570 與 CUDA 12.8+ 的 wheel，
+#       Pascal 鎖版組合不支援；改用最新 onnxruntime-gpu[cuda,cudnn]。
+#   * CUDA 實測失敗時 SAM/OOB 會自動降級 CPU（可用但慢），不會讓平台起不來。
+onnxruntime-gpu==1.22.0
+nvidia-cuda-runtime-cu12==12.2.140
+nvidia-cublas-cu12==12.2.5.6
+nvidia-cudnn-cu12==9.1.1.17
+nvidia-cufft-cu12==11.0.8.103
+nvidia-curand-cu12==10.3.3.141
+nvidia-cuda-nvrtc-cu12==12.2.140

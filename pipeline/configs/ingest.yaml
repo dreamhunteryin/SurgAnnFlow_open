@@ -1,0 +1,22 @@
+# 影片標準化 / ingest 參數（R5：參數集中，勿 hard-code）。
+
+target:
+  height: 720          # 標準化高度；寬度自動保持比例（ffmpeg -2）
+  fps: 25              # 強制固定幀率（CFR）—— LS frame 精度的前提
+  crf: 20              # H.264 品質（越小越好，20 視覺近無損）
+  preset: medium       # 編碼速度/壓縮比取捨（slow 畫質同但慢~2x；medium 可讓 1hr 影片 <30min 達標）
+  pix_fmt: yuv420p     # 最大相容性
+  gop: 25              # keyframe 間隔 = fps → 每秒一個 keyframe，拖曳 seek <1s
+  faststart: true      # moov atom 前置，網頁快速起播
+  strip_audio: true    # 去音軌（去識別化 + 省頻寬）
+
+verify:                # 不通過即擋下，不入庫（整個系統 frame/timestamp 正確性的基石）
+  expect_fps: 25.0
+  fps_tolerance: 0.001
+  frame_count_tolerance: 1   # 實測 frame 數 vs round(duration*fps) 容許 ±1
+  expect_height: 720
+
+sampling:              # 抽樣點註冊（此時只寫 frames 表 metadata，不一定馬上抽圖）
+  intervals:           # 名稱 -> 間隔秒數；frame 間隔 = 秒數 * fps
+    sample_5s: 5       # 每 5s -> 每 125 frames
+    sample_30s: 30     # 每 30s -> 每 750 frames

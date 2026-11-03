@@ -1,0 +1,75 @@
+# Temporal 標註 taxonomy（草稿，依 Cholec80 / CholecT50 命名；定案後直接增修本檔，
+# 重啟 `surgann annotate` 即生效。）
+# 四層各自獨立、允許重疊（phase 內含 action、action 內含 triplet）。
+#
+# 顏色：預設自動配色；要指定某 label 的顏色，在下方 colors 區塊加
+#   colors:
+#     phase/Preparation: "#4dc9b0"    # 格式為 layer/label: "#hex"
+
+phase:                        # Cholec80 7 phases
+  - Preparation
+  - Calot_triangle_dissection
+  - Clipping_and_cutting
+  - Gallbladder_dissection
+  - Gallbladder_packaging
+  - Cleaning_and_coagulation
+  - Gallbladder_retraction
+
+action:                       # CholecT50 verbs（interval 用）
+  - grasp
+  - retract
+  - dissect
+  - coagulate
+  - clip
+  - cut
+  - aspirate
+  - irrigate
+  - pack
+
+event:                        # point-like 或短區段事件
+  - bleeding
+  - CBD_visible
+  - ICG_visible
+  - CVS_achieved
+  - clip_applied
+
+# Triplet：generic segment + perRegion 三選單（避免 instrument×verb×target 組合爆炸）
+# 自訂 label 顏色（選填；未列出的自動配色）。格式 layer/label: "#hex"
+colors: {}
+
+triplet:
+  segment_label: Triplet
+  instrument:
+    - grasper
+    - bipolar
+    - hook
+    - scissors
+    - clipper
+    - irrigator
+  verb:
+    - grasp
+    - retract
+    - dissect
+    - coagulate
+    - clip
+    - cut
+    - aspirate
+    - irrigate
+    - pack
+    - null_verb
+  target:
+    - gallbladder
+    - cystic_duct
+    - cystic_artery
+    - cystic_plate
+    - cystic_pedicle
+    - liver
+    - omentum
+    - peritoneum
+    - gut
+    - abdominal_wall_cavity
+    - specimen_bag
+    - fluid
+    - blood_vessel
+    - adhesion
+    - null_target
